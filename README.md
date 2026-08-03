@@ -154,46 +154,46 @@ walkthrough of each box in the diagram lives in
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ 1. User Request                                                  │
+│ 1. User Request                                                 │
 │    • User asks for content via Interface                        │
-│    • Orchestrator classifies intent, checks Session Store        │
+│    • Orchestrator classifies intent, checks Session Store       │
 └────────────────────────────┬────────────────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ 2. Research                                                       │
-│    • Research Agent ⇄ Search tools (SERP + Perplexity)          │
-│    • Capped-retry tool loop; results include citations           │
+│ 2. Research                                                     │
+│    • Research Agent <=> Search tools (SERP + Perplexity)        │
+│    • Capped-retry tool loop; results include citations          │
 └────────────────────────────┬────────────────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ 3. Strategy → Draft                                               │
-│    • Content Strategist formats research into a brief            │
-│    • Blog Writer produces the full SEO post FIRST                │
+│ 3. Strategy → Draft                                             │
+│    • Content Strategist formats research into a brief           │
+│    • Blog Writer produces the full SEO post FIRST               │
 └────────────────────────────┬────────────────────────────────────┘
                              │
                  ┌───────────┴───────────┐
                  ▼                       ▼
 ┌───────────────────────────┐ ┌───────────────────────────────────┐
-│ 4a. LinkedIn Writer         │ │ 4b. Image Generator ⇄ Image tools  │
-│    hook + link to blog      │ │    visual derived from finished    │
-│                              │ │    blog, capped-retry tool loop    │
-└──────────────┬───────────────┘ └────────────────┬────────────────┘
+│ 4a. LinkedIn Writer       │ │ 4b. Img Generator <=> Image tools │
+│    hook + link to blog    │ │    visual derived from finished   │
+│                           │ │    blog, capped-retry tool loop   │
+└────────────────┬──────────┘ └──────────┬────────────────────────┘
                  └───────────┬───────────┘
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ 5. Synthesis                                                      │
-│    • Synthesizer assembles blog + LinkedIn + image into one      │
-│      cross-linked package                                        │
+│ 5. Synthesis                                                    │
+│    • Synthesizer assembles blog + LinkedIn + image into one     │
+│      cross-linked package                                       │
 └────────────────────────────┬────────────────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ 6. Quality Gate                                                   │
-│    • Structural, SEO, brand, and fact checks                     │
-│    • Pass → Dashboard + Export                                   │
-│    • Fail → conditional edge back to Blog Writer (capped retries)│
+│ 6. Quality Gate                                                 │
+│    • Structural, SEO, brand, and fact checks                    │
+│    • Pass → Dashboard + Export                                  │
+│    • Fail → conditional edge back to Blog Agent (capped retries)│
 └─────────────────────────────────────────────────────────────────┘
 ```
 
