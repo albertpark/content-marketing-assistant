@@ -97,24 +97,89 @@ def _node_progress_line(node_name: str, provider_label: str) -> tuple[str, str]:
     return info["label"], detail
 
 
-async def _run_turn(input_state: dict, thread_id: str, status=None, provider_label: str = "") -> None:
+# blog_writer and linkedin_writer both respond with a single JSON blob (see
+# their _SYSTEM_PROMPTs), not plain prose, so raw token chunks can't just be
+# appended and displayed — that would show a growing, escaped, incomplete
+# JSON string. This does a best-effort incremental decode of one string
+# field's value out of a still-streaming JSON blob, for live display only;
+# the authoritative parse is each agent's own _parse_*_post once the node
+# actually finishes.
+def _extract_streaming_field(accumulated_raw: str, field_name: str) -> str:
+    marker = f'"{field_name}":'
+    idx = accumulated_raw.find(marker)
+    if idx == -1:
+        return ""
+    rest = accumulated_raw[idx + len(marker) :].lstrip()
+    if not rest.startswith('"'):
+        return ""
+    rest = rest[1:]
+    out = []
+    i = 0
+    while i < len(rest):
+        ch = rest[i]
+        if ch == "\\":
+            if i + 1 >= len(rest):
+                break  # incomplete escape sequence — wait for the next chunk
+            out.append({"n": "\n", "t": "\t", '"': '"', "\\": "\\"}.get(rest[i + 1], rest[i + 1]))
+            i += 2
+            continue
+        if ch == '"':
+            break
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+async def _run_turn(
+    input_state: dict,
+    thread_id: str,
+    status=None,
+    provider_label: str = "",
+    blog_placeholder=None,
+    linkedin_placeholder=None,
+) -> None:
     """Runs the graph. When `status` (an st.status container) is given, streams
-    per-node start/finish events into it live instead of blocking silently."""
+    per-node start/finish events into it live. When blog_placeholder /
+    linkedin_placeholder (st.empty() containers) are given, also streams the
+    blog post body / LinkedIn post text into them token-by-token as they're
+    generated, instead of only appearing once the whole run finishes."""
     config = {"configurable": {"thread_id": thread_id}}
+    streaming = status is not None or blog_placeholder is not None or linkedin_placeholder is not None
 
     async def op(graph):
-        if status is None:
+        if not streaming:
             return await graph.ainvoke(input_state, config=config)
-        async for event in graph.astream(input_state, config=config, stream_mode="debug"):
-            node_name = event.get("payload", {}).get("name")
-            if not node_name:
-                continue
-            label, detail = _node_progress_line(node_name, provider_label)
-            if event["type"] == "task":
-                status.update(label=f"Working — {label}...")
-                status.write(f"▶ {label} started" + (f" — {detail}" if detail else ""))
-            elif event["type"] == "task_result":
-                status.write(f"✓ {label} done")
+
+        raw_by_node: dict[str, str] = {}
+        async for mode, payload in graph.astream(
+            input_state, config=config, stream_mode=["debug", "messages"]
+        ):
+            if mode == "debug":
+                if status is None:
+                    continue
+                node_name = payload.get("payload", {}).get("name")
+                if not node_name:
+                    continue
+                label, detail = _node_progress_line(node_name, provider_label)
+                if payload["type"] == "task":
+                    status.update(label=f"Working — {label}...")
+                    status.write(f"▶ {label} started" + (f" — {detail}" if detail else ""))
+                elif payload["type"] == "task_result":
+                    status.write(f"✓ {label} done")
+            elif mode == "messages":
+                msg_chunk, metadata = payload
+                node_name = metadata.get("langgraph_node")
+                if node_name not in ("blog_writer", "linkedin_writer"):
+                    continue
+                raw_by_node[node_name] = raw_by_node.get(node_name, "") + (msg_chunk.content or "")
+                if node_name == "blog_writer" and blog_placeholder is not None:
+                    body = _extract_streaming_field(raw_by_node[node_name], "body_markdown")
+                    if body:
+                        blog_placeholder.markdown(body)
+                elif node_name == "linkedin_writer" and linkedin_placeholder is not None:
+                    text = _extract_streaming_field(raw_by_node[node_name], "text")
+                    if text:
+                        linkedin_placeholder.text(text)
         return None
 
     await _with_graph(op)
@@ -339,20 +404,27 @@ def main() -> None:
             if registry is not None:
                 registry.record_turn(thread_id)
 
-        with st.status("Working...", expanded=False) as status:
-            try:
-                _run_async(
-                    _run_turn(
-                        input_state,
-                        thread_id,
-                        status=status,
-                        provider_label=_PROVIDER_LABELS[selected_provider],
+        with st.chat_message("assistant"):
+            # Created before the status block so the growing blog/LinkedIn text
+            # renders above the collapsed progress pill, not hidden inside it.
+            blog_placeholder = st.empty()
+            linkedin_placeholder = st.empty()
+            with st.status("Working...", expanded=False) as status:
+                try:
+                    _run_async(
+                        _run_turn(
+                            input_state,
+                            thread_id,
+                            status=status,
+                            provider_label=_PROVIDER_LABELS[selected_provider],
+                            blog_placeholder=blog_placeholder,
+                            linkedin_placeholder=linkedin_placeholder,
+                        )
                     )
-                )
-            except Exception:
-                status.update(label="Failed", state="error")
-                raise
-            status.update(label="Done", state="complete")
+                except Exception:
+                    status.update(label="Failed", state="error")
+                    raise
+                status.update(label="Done", state="complete")
 
         st.session_state.chat_log.append({"role": "assistant", "content": "Done — see the results below."})
         st.rerun()

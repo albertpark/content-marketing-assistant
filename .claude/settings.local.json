@@ -38,7 +38,9 @@
       "Bash(command -v uv)",
       "Bash(uv run *)",
       "Bash(.venv/Scripts/python -m py_compile scripts/run_evaluation.py)",
-      "Bash(git init *)"
+      "Bash(git init *)",
+      "Bash(.venv/Scripts/python -m pytest tests/ -q)",
+      "Bash(.venv/Scripts/python -m py_compile src/web_app/streamlit_app.py src/agents/linkedin_writer.py tests/integration/test_graph_e2e.py)"
     ]
   }
 }

@@ -51,6 +51,9 @@ BLOG_RESPONSE_GOOD = json.dumps(
 BLOG_RESPONSE_BAD = json.dumps(
     {"title": "", "body_markdown": "too short", "meta_description": "", "headers": []}
 )
+LINKEDIN_RESPONSE = json.dumps(
+    {"text": "Big news! Check out our new guide.\n\nRead it here: /blog/test-topic", "hashtags": ["#AI"]}
+)
 
 
 @pytest.fixture(autouse=True)
@@ -80,6 +83,7 @@ def _patch_agent_llms(monkeypatch, blog_response: str):
         "research_agent": RESEARCH_RESPONSE,
         "content_strategist": STRATEGIST_RESPONSE,
         "blog_writer": blog_response,
+        "linkedin_writer": LINKEDIN_RESPONSE,
     }
     monkeypatch.setattr(
         BaseAgent, "_llm_for", lambda self, provider: _FakeChatModel(responses[self.agent_name])
