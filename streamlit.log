@@ -1,0 +1,46 @@
+2026-08-02 08:13:33.080 Uvicorn server started on :::8501
+
+  You can now view your Streamlit app in your browser.
+
+  Local URL: http://localhost:8501
+  Network URL: http://10.0.0.11:8501
+  External URL: http://67.161.21.114:8501
+
+2026-08-02 09:28:13.591 Please replace `st.components.v1.html` with `st.iframe`.
+
+`st.components.v1.html` will be removed after 2026-06-01.
+2026-08-02 09:29:09.836 Please replace `st.components.v1.html` with `st.iframe`.
+
+`st.components.v1.html` will be removed after 2026-06-01.
+2026-08-02 09:29:27.358 Please replace `st.components.v1.html` with `st.iframe`.
+
+`st.components.v1.html` will be removed after 2026-06-01.
+2026-08-02 09:29:33.805 Please replace `st.components.v1.html` with `st.iframe`.
+
+`st.components.v1.html` will be removed after 2026-06-01.
+2026-08-02 10:29:41.840 Please replace `st.components.v1.html` with `st.iframe`.
+
+`st.components.v1.html` will be removed after 2026-06-01.
+2026-08-02 10:32:13.953 Please replace `st.components.v1.html` with `st.iframe`.
+
+`st.components.v1.html` will be removed after 2026-06-01.
+2026-08-02 10:34:12.468 Please replace `st.components.v1.html` with `st.iframe`.
+
+`st.components.v1.html` will be removed after 2026-06-01.
+2026-08-02 10:34:19.459 Please replace `st.components.v1.html` with `st.iframe`.
+
+`st.components.v1.html` will be removed after 2026-06-01.
+2026-08-02 10:34:23.009 Please replace `st.components.v1.html` with `st.iframe`.
+
+`st.components.v1.html` will be removed after 2026-06-01.
+2026-08-02 10:36:20.226 Please replace `st.components.v1.html` with `st.iframe`.
+
+`st.components.v1.html` will be removed after 2026-06-01.
+[orchestrator] provider 'gemini' exhausted retries; falling back
+[research_agent] provider 'gemini' exhausted retries; falling back
+[research_agent] provider 'gemini' exhausted retries; falling back
+[content_strategist] provider 'gemini' exhausted retries; falling back
+[blog_writer] provider 'gemini' exhausted retries; falling back
+2026-08-02 14:49:13.003 Please replace `st.components.v1.html` with `st.iframe`.
+
+`st.components.v1.html` will be removed after 2026-06-01.

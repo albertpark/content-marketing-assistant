@@ -1,0 +1,108 @@
+<svg viewBox="0 0 820 1168" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica, Arial, sans-serif">
+<style>
+  .title    { fill: #6E56CF; }
+  .subtitle { fill: #635F72; }
+  .legend   { fill: #635F72; }
+  .arrow    { stroke: #6E6C7C; }
+  .arrowFill{ fill: #6E6C7C; }
+  .tool     { stroke: #9C3E5F; }
+  .toolFill { fill: #9C3E5F; }
+  .sess-stroke { stroke: #6B6690; }
+  .sess-text   { fill: #4B4568; }
+  .integ-stroke { fill: none; stroke: #C97250; }
+  .integ-title  { fill: #8A4A2E; }
+  .integ-text   { fill: #8A4A2E; }
+  @media (prefers-color-scheme: dark) {
+    .subtitle { fill: #8B889C; }
+    .legend   { fill: #9A97AC; }
+    .arrow    { stroke: #8B8B9A; }
+    .arrowFill{ fill: #8B8B9A; }
+    .tool     { stroke: #B4577A; }
+    .toolFill { fill: #B4577A; }
+    .sess-stroke { stroke: #8A85B0; }
+    .sess-text   { fill: #C9C4E8; }
+    .integ-stroke { stroke: #D98F73; }
+    .integ-title  { fill: #E7B9A4; }
+    .integ-text   { fill: #E7B9A4; }
+  }
+</style>
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowFill"/></marker>
+<marker id="arrowTool" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="toolFill"/></marker>
+</defs>
+<text x="30" y="34" font-size="21" font-weight="700" class="title">ContentAlchemy — System Architecture</text>
+<text x="30" y="54" font-size="10.5" font-style="italic" class="subtitle">Interface → Orchestrator → Research → Strategist → Blog → LinkedIn ∥ Image → Synthesizer → Quality → Integrations</text>
+<path d="M 340.0 174.0 L 340.0 214.0 " fill="none" stroke-width="1.6" class="arrow" marker-end="url(#arrow)"/>
+<path d="M 340.0 270.0 L 340.0 310.0 " fill="none" stroke-width="1.6" class="arrow" marker-end="url(#arrow)"/>
+<path d="M 340.0 366.0 L 340.0 380.0 " fill="none" stroke-width="1.6" class="tool" marker-end="url(#arrowTool)" marker-start="url(#arrowTool)"/>
+<path d="M 340.0 418.0 L 340.0 435.0 L 340.0 435.0 L 340.0 452.0 " fill="none" stroke-width="1.6" class="arrow" marker-end="url(#arrow)"/>
+<path d="M 340.0 508.0 L 340.0 548.0 " fill="none" stroke-width="1.6" class="arrow" marker-end="url(#arrow)"/>
+<path d="M 340.0 604.0 L 340.0 624.0 L 200.0 624.0 L 200.0 644.0 " fill="none" stroke-width="1.6" class="arrow" marker-end="url(#arrow)"/>
+<path d="M 340.0 604.0 L 340.0 624.0 L 500.0 624.0 L 500.0 644.0 " fill="none" stroke-width="1.6" class="arrow" marker-end="url(#arrow)"/>
+<path d="M 500.0 700.0 L 500.0 714.0 " fill="none" stroke-width="1.6" class="tool" marker-end="url(#arrowTool)" marker-start="url(#arrowTool)"/>
+<path d="M 200.0 700.0 L 200.0 769.0 L 280.0 769.0 L 280.0 786.0 " fill="none" stroke-width="1.6" class="arrow" marker-end="url(#arrow)"/>
+<path d="M 500.0 752.0 L 500.0 769.0 L 400.0 769.0 L 400.0 786.0 " fill="none" stroke-width="1.6" class="arrow" marker-end="url(#arrow)"/>
+<path d="M 340.0 842.0 L 340.0 882.0 " fill="none" stroke-width="1.6" class="arrow" marker-end="url(#arrow)"/>
+<path d="M 340.0 942.0 L 340.0 962.0 L 200.0 962.0 L 200.0 982.0 " fill="none" stroke-width="1.6" class="arrow" marker-end="url(#arrow)"/>
+<path d="M 340.0 942.0 L 340.0 962.0 L 500.0 962.0 L 500.0 982.0 " fill="none" stroke-width="1.6" class="arrow" marker-end="url(#arrow)"/>
+<path d="M 210.0 912.0 L 158.0 912.0 L 158.0 576.0 L 210.0 576.0 " fill="none" stroke-width="1.6" stroke-dasharray="6,4" class="arrow" marker-end="url(#arrow)"/>
+<path d="M 70.0 242.0 L 210.0 242.0 " fill="none" stroke-width="1.2" stroke-dasharray="3,3" opacity="0.75" class="arrow" marker-end="url(#arrow)"/>
+<path d="M 470.0 338.0 L 622.0 338.0 " fill="none" stroke-width="1.2" stroke-dasharray="3,3" opacity="0.75" class="arrow" marker-end="url(#arrow)"/>
+<path d="M 610.0 672.0 L 622.0 672.0 " fill="none" stroke-width="1.2" stroke-dasharray="3,3" opacity="0.75" class="arrow" marker-end="url(#arrow)"/>
+<rect x="210.0" y="118.0" width="260.0" height="56.0" rx="10" ry="10" fill="#ECE6D8" stroke="#C7BC9C" stroke-width="1.3"/>
+<text x="340.0" y="144.1" font-size="14" font-weight="700" text-anchor="middle" fill="#3B3324" opacity="1">Interface</text>
+<text x="340.0" y="165.8" font-size="8.7" font-weight="400" text-anchor="middle" fill="#3B3324" opacity="0.82">Chat · Dashboard · Research panel · Export</text>
+<rect x="210.0" y="214.0" width="260.0" height="56.0" rx="10" ry="10" fill="#E2DFFA" stroke="#A79EE3" stroke-width="1.3"/>
+<text x="340.0" y="240.1" font-size="14" font-weight="700" text-anchor="middle" fill="#332B6E" opacity="1">Orchestrator</text>
+<text x="340.0" y="261.8" font-size="8.7" font-weight="400" text-anchor="middle" fill="#332B6E" opacity="0.82">Query Handler + Coordinator — intent, dispatch</text>
+<rect x="210.0" y="310.0" width="260.0" height="56.0" rx="10" ry="10" fill="#D9E8FB" stroke="#7DAEDD" stroke-width="1.3"/>
+<text x="340.0" y="335.8" font-size="13" font-weight="700" text-anchor="middle" fill="#1C4A77" opacity="1">Research Agent</text>
+<text x="340.0" y="356.0" font-size="8.7" font-weight="400" text-anchor="middle" fill="#1C4A77" opacity="0.82">web research, source synthesis</text>
+<rect x="235.0" y="380.0" width="210.0" height="38.0" rx="8" ry="8" fill="#F6DCE4" stroke="#B4577A" stroke-width="1.3"/>
+<text x="340.0" y="396.6" font-size="9.5" font-weight="700" text-anchor="middle" fill="#732142" opacity="1">Search tools</text>
+<text x="340.0" y="411.3" font-size="7.5" font-weight="400" text-anchor="middle" fill="#732142" opacity="0.82">SERP + Perplexity</text>
+<rect x="210.0" y="452.0" width="260.0" height="56.0" rx="10" ry="10" fill="#D9E8FB" stroke="#7DAEDD" stroke-width="1.3"/>
+<text x="340.0" y="477.8" font-size="13" font-weight="700" text-anchor="middle" fill="#1C4A77" opacity="1">Content Strategist</text>
+<text x="340.0" y="498.0" font-size="8.7" font-weight="400" text-anchor="middle" fill="#1C4A77" opacity="0.82">formats research → brief</text>
+<rect x="210.0" y="548.0" width="260.0" height="56.0" rx="10" ry="10" fill="#D9E8FB" stroke="#7DAEDD" stroke-width="1.3"/>
+<text x="340.0" y="573.8" font-size="13" font-weight="700" text-anchor="middle" fill="#1C4A77" opacity="1">Blog Writer</text>
+<text x="340.0" y="594.0" font-size="8.7" font-weight="400" text-anchor="middle" fill="#1C4A77" opacity="0.82">runs first — full SEO post</text>
+<rect x="90.0" y="644.0" width="220.0" height="56.0" rx="10" ry="10" fill="#D9E8FB" stroke="#7DAEDD" stroke-width="1.3"/>
+<text x="200.0" y="669.8" font-size="12.5" font-weight="700" text-anchor="middle" fill="#1C4A77" opacity="1">LinkedIn Writer</text>
+<text x="200.0" y="689.2" font-size="8.5" font-weight="400" text-anchor="middle" fill="#1C4A77" opacity="0.82">hook + link to blog</text>
+<rect x="390.0" y="644.0" width="220.0" height="56.0" rx="10" ry="10" fill="#D9E8FB" stroke="#7DAEDD" stroke-width="1.3"/>
+<text x="500.0" y="669.8" font-size="12.5" font-weight="700" text-anchor="middle" fill="#1C4A77" opacity="1">Image Generator</text>
+<text x="500.0" y="689.2" font-size="8.5" font-weight="400" text-anchor="middle" fill="#1C4A77" opacity="0.82">visual from finished blog</text>
+<rect x="405.0" y="714.0" width="190.0" height="38.0" rx="8" ry="8" fill="#F6DCE4" stroke="#B4577A" stroke-width="1.3"/>
+<text x="500.0" y="730.6" font-size="9.5" font-weight="700" text-anchor="middle" fill="#732142" opacity="1">Image tools</text>
+<text x="500.0" y="745.3" font-size="7.5" font-weight="400" text-anchor="middle" fill="#732142" opacity="0.82">GPT Image + fallback</text>
+<rect x="210.0" y="786.0" width="260.0" height="56.0" rx="10" ry="10" fill="#DCF2E6" stroke="#6FBE93" stroke-width="1.3"/>
+<text x="340.0" y="812.1" font-size="14" font-weight="700" text-anchor="middle" fill="#1B5C38" opacity="1">Synthesizer</text>
+<text x="340.0" y="833.8" font-size="8.7" font-weight="400" text-anchor="middle" fill="#1B5C38" opacity="0.82">assembles final cross-linked package</text>
+<rect x="210.0" y="882.0" width="260.0" height="60.0" rx="10" ry="10" fill="#FBEAD2" stroke="#D9A85C" stroke-width="1.3"/>
+<text x="340.0" y="909.7" font-size="12.5" font-weight="700" text-anchor="middle" fill="#7A4E14" opacity="1">Quality &amp; Enhancement Pipeline</text>
+<text x="340.0" y="929.0" font-size="8.7" font-weight="400" text-anchor="middle" fill="#7A4E14" opacity="0.82">structural · SEO · brand · facts</text>
+<rect x="90.0" y="982.0" width="220.0" height="56.0" rx="10" ry="10" fill="#ECE6D8" stroke="#C7BC9C" stroke-width="1.3"/>
+<text x="200.0" y="1007.6" font-size="12" font-weight="700" text-anchor="middle" fill="#3B3324" opacity="1">Content Dashboard</text>
+<text x="200.0" y="1026.2" font-size="8.5" font-weight="400" text-anchor="middle" fill="#3B3324" opacity="0.82">review, edit, approve</text>
+<rect x="390.0" y="982.0" width="220.0" height="56.0" rx="10" ry="10" fill="#ECE6D8" stroke="#C7BC9C" stroke-width="1.3"/>
+<text x="500.0" y="1007.6" font-size="12" font-weight="700" text-anchor="middle" fill="#3B3324" opacity="1">Export Tools</text>
+<text x="500.0" y="1026.2" font-size="8.5" font-weight="400" text-anchor="middle" fill="#3B3324" opacity="0.82">per-platform formats, images</text>
+<rect x="26.0" y="204.0" width="44.0" height="648.0" rx="22.0" ry="22.0" fill="none" stroke-width="1.3" stroke-dasharray="5,4" class="sess-stroke"/>
+<text x="48.0" y="528.0" font-size="10" font-weight="600" text-anchor="middle" class="sess-text" transform="rotate(-90 48.0 528.0)">Session Store — LangGraph checkpoints, conversation state</text>
+<rect x="622.0" y="300.0" width="172.0" height="552.0" rx="10" ry="10" fill="none" stroke-width="1.3" stroke-dasharray="5,4" class="integ-stroke"/>
+<text x="638.0" y="326.0" font-size="11.5" font-weight="700" class="integ-title">Integrations Layer</text>
+<text x="638.0" y="346.0" font-size="8.7" font-weight="400" class="integ-text" opacity="0.85">OpenAI · Anthropic · Gemini</text>
+<text x="638.0" y="361.5" font-size="8.7" font-weight="400" class="integ-text" opacity="0.85">Perplexity · SERP · Image gen</text>
+<text x="638.0" y="385.0" font-size="9" font-weight="700" class="integ-text" opacity="1">resilience</text>
+<text x="638.0" y="400.5" font-size="8.7" font-weight="400" class="integ-text" opacity="0.85">retry / backoff / fallback</text>
+<text x="638.0" y="424.0" font-size="9" font-weight="700" class="integ-text" opacity="1">performance</text>
+<text x="638.0" y="439.5" font-size="8.7" font-weight="400" class="integ-text" opacity="0.85">cache · rate-limit · cost</text>
+<line x1="30" y1="1093" x2="65" y2="1093" stroke-width="1.6" class="arrow"/>
+<text x="72" y="1097" font-size="10" class="legend">Fixed edge</text>
+<line x1="185" y1="1093" x2="220" y2="1093" stroke-width="1.6" stroke-dasharray="6,4" class="arrow"/>
+<text x="227" y="1097" font-size="10" class="legend">Conditional edge (revision loop)</text>
+<line x1="460" y1="1093" x2="495" y2="1093" stroke-width="1.6" class="tool"/>
+<text x="502" y="1097" font-size="10" class="legend">Tool loop (bidirectional, capped retries)</text>
+<text x="30" y="1125" font-size="9" font-style="italic" class="subtitle">Full component catalog and rubric cross-reference: docs/hld.md &#8226; Presenter reference: docs/component_notes.md</text>
+</svg>

@@ -1,0 +1,21 @@
+environment: production
+
+llm:
+  primary_provider: openai
+  primary_model: gpt-4o
+  fallback_provider: anthropic
+
+research:
+  primary_provider: serpapi
+  fallback_provider: perplexity
+
+image:
+  primary_provider: openai
+  fallback_provider: null
+
+session_store:
+  backend: postgres
+  url: ${SESSION_STORE_URL}   # Supabase pooler connection string (transaction mode)
+
+logging:
+  level: INFO

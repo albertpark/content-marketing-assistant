@@ -1,0 +1,25 @@
+environment: development
+
+llm:
+  primary_provider: openai
+  primary_model: gpt-4o
+  fallback_provider: anthropic
+
+research:
+  primary_provider: serpapi
+  fallback_provider: perplexity
+
+image:
+  primary_provider: openai
+  fallback_provider: null
+
+session_store:
+  backend: postgres
+  url: ${SESSION_STORE_URL}   # Supabase pooler connection string
+  # Alternative for fully-offline/no-external-DB use: backend: sqlite,
+  # path: contentalchemy.db (relative to project root; override via
+  # SESSION_STORE_PATH). Also supported: backend: memory (non-persistent,
+  # mainly for tests — see SESSION_STORE_BACKEND env override).
+
+logging:
+  level: DEBUG

@@ -1,0 +1,16 @@
+.assignment/
+.env
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Generated at runtime
+src/web_app/static/generated/
+contentalchemy.db
+contentalchemy.db-wal
+contentalchemy.db-shm

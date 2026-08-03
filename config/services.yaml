@@ -1,0 +1,20 @@
+providers:
+  openai:
+    api_key_env: OPENAI_API_KEY
+  anthropic:
+    api_key_env: ANTHROPIC_API_KEY
+  gemini:
+    api_key_env: GOOGLE_API_KEY
+  serpapi:
+    api_key_env: SERPAPI_API_KEY
+  perplexity:
+    api_key_env: PERPLEXITY_API_KEY
+
+resilience:
+  max_retries: 3
+  backoff_seconds: 2
+  revision_loop_cap: 1   # override via REVISION_LOOP_CAP env var
+
+performance:
+  cache_ttl_minutes: 30
+  rate_limit_per_minute: 60
