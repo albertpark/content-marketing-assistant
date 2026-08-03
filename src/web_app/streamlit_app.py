@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import html
 import json
+from datetime import datetime
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -163,6 +164,14 @@ def _render_provider_selector(settings) -> str:
     return selected
 
 
+def _format_updated_at(iso_timestamp: str) -> str:
+    try:
+        dt = datetime.fromisoformat(iso_timestamp)
+    except ValueError:
+        return iso_timestamp
+    return f"{dt.strftime('%b')} {dt.day}, {dt.year}, {dt.strftime('%I:%M %p').lstrip('0')}"
+
+
 def _render_sidebar(registry) -> None:
     with st.sidebar:
         st.header("Sessions")
@@ -177,7 +186,7 @@ def _render_sidebar(registry) -> None:
             clicked = st.button(
                 ("• " if is_current else "") + session["title"],
                 key=f"session_{session['session_id']}",
-                help=f"Updated {session['updated_at']} · {session['turn_count']} turn(s)",
+                help=f"Updated {_format_updated_at(session['updated_at'])} · {session['turn_count']} turn(s)",
                 use_container_width=True,
                 disabled=is_current,
             )
