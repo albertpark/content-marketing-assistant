@@ -49,6 +49,11 @@ class AgentState(TypedDict):
     # had for this key, defeating that reset.
     research_messages: list[BaseMessage]
     research_findings: list[SearchResult]
+    # Completed research_tools_node round-trips for the current research run, anchored
+    # to 0 on every fresh start by research_agent_node (same anchoring rationale as
+    # research_findings above). Caps the loop at
+    # src.core.router.MAX_RESEARCH_TOOL_ITERATIONS — see should_continue_research.
+    research_tool_iterations: int
     research_provider_used: str | None  # "serpapi" | "perplexity" | None
 
     # strategy
@@ -89,6 +94,7 @@ def initial_state(session_id: str, user_query: str, llm_provider: str | None = N
         llm_provider=llm_provider,
         research_messages=[],
         research_findings=[],
+        research_tool_iterations=0,
         research_provider_used=None,
         content_brief=None,
         blog_post=None,

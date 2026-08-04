@@ -18,6 +18,7 @@ from langchain_core.tools import tool
 
 from src.agents.base_agent import BaseAgent
 from src.agents.prompts import RESEARCH_AGENT_PROMPT
+from src.core.router import MAX_RESEARCH_TOOL_ITERATIONS
 from src.integrations.perplexity_client import search_perplexity
 from src.integrations.resilience import AllRetriesExhaustedError
 from src.integrations.serp_client import search_serp
@@ -63,15 +64,21 @@ def _new_agent(provider: str | None) -> BaseAgent:
 async def research_agent_node(state: "AgentState") -> dict:
     """Calls the LLM once. On first invocation (state["research_messages"] empty —
     reset by the orchestrator's Send() payload for every fresh research run, see
-    query_handler.py) builds the initial prompt and a clean research_findings
-    baseline; on subsequent invocations (after research_tools_node ran) continues
-    from the accumulated buffer.
+    query_handler.py) builds the initial prompt and a clean research_findings/
+    research_tool_iterations baseline; on subsequent invocations (after
+    research_tools_node ran) continues from the accumulated buffer.
 
-    research_findings is always returned explicitly (not just on finalize): it's
-    read by research_tools_node, which is reached via a normal conditional edge and
-    so only ever sees the persisted/merged state, never the orchestrator's Send()
-    payload — this is what actually anchors a clean baseline for research_tools_node
-    to accumulate onto."""
+    research_findings and research_tool_iterations are always returned explicitly
+    (not just on finalize): both are read by research_tools_node, which is reached
+    via a normal conditional edge and so only ever sees the persisted/merged state,
+    never the orchestrator's Send() payload — this is what actually anchors a clean
+    baseline for research_tools_node to accumulate/increment onto.
+
+    Finalizes (sets research_provider_used/last_agent_used) either when the model
+    stops requesting tools, or when research_tool_iterations has already hit
+    MAX_RESEARCH_TOOL_ITERATIONS completed round-trips — mirrors
+    should_continue_research's identical condition in src/core/router.py, so the
+    node and the router never disagree about whether the loop is over."""
     agent = _new_agent(state.get("llm_provider"))
 
     existing = state.get("research_messages") or []
@@ -82,15 +89,24 @@ async def research_agent_node(state: "AgentState") -> dict:
             HumanMessage(content=state["user_query"]),
         ]
         findings_so_far: list = []
+        iterations_so_far = 0
     else:
         all_msgs = list(existing)
         findings_so_far = state.get("research_findings") or []
+        iterations_so_far = state.get("research_tool_iterations", 0)
 
     response = await agent.call_once(all_msgs)
     all_msgs = [*all_msgs, response]
 
-    update: dict = {"research_messages": all_msgs, "research_findings": findings_so_far}
-    if not getattr(response, "tool_calls", None):
+    has_pending_tool_calls = bool(getattr(response, "tool_calls", None))
+    capped = has_pending_tool_calls and iterations_so_far >= MAX_RESEARCH_TOOL_ITERATIONS
+
+    update: dict = {
+        "research_messages": all_msgs,
+        "research_findings": findings_so_far,
+        "research_tool_iterations": iterations_so_far,
+    }
+    if not has_pending_tool_calls or capped:
         update["research_provider_used"] = findings_so_far[0]["source"] if findings_so_far else None
         update["last_agent_used"] = "research_agent"
     return update
@@ -99,7 +115,9 @@ async def research_agent_node(state: "AgentState") -> dict:
 async def research_tools_node(state: "AgentState") -> dict:
     """Executes the tool_calls on the last message in research_messages, appending
     each ToolMessage to the buffer and each tool's structured artifact to
-    research_findings."""
+    research_findings. Increments research_tool_iterations by one completed
+    round-trip — read back by research_agent_node/should_continue_research to
+    enforce MAX_RESEARCH_TOOL_ITERATIONS."""
     all_msgs = list(state["research_messages"])
     last_msg = all_msgs[-1]
 
@@ -116,4 +134,5 @@ async def research_tools_node(state: "AgentState") -> dict:
         if result_msg.artifact:
             findings.extend(result_msg.artifact)
 
-    return {"research_messages": all_msgs, "research_findings": findings}
+    iterations = state.get("research_tool_iterations", 0) + 1
+    return {"research_messages": all_msgs, "research_findings": findings, "research_tool_iterations": iterations}

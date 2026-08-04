@@ -21,13 +21,28 @@ from src.workflow.state_management import AgentState
 # multi-target, set of agents. What remains here are the two routing decisions that
 # genuinely are pure state reads gating a fixed edge.
 
+# Caps the research_agent <-> research_tools_node graph-level tool loop (see
+# should_continue_research and research_agent_node in src/agents/research_agent.py).
+# This is what hld.md/README document as the Research Agent's "tool loop (bidirectional,
+# capped retries)" — mirrors BaseAgent.invoke()'s historical max_tool_iterations=3
+# default, now enforced at the graph level since this loop no longer runs through
+# BaseAgent.invoke() (it uses call_once() instead, which has no cap of its own).
+MAX_RESEARCH_TOOL_ITERATIONS = 3
+
 
 def should_continue_research(state: AgentState) -> str:
     """Reads the last message in research_messages (see research_agent_node /
     research_tools_node in src/agents/research_agent.py) and decides whether the
-    tool loop needs another turn."""
+    tool loop needs another turn. Capped at MAX_RESEARCH_TOOL_ITERATIONS completed
+    research_tools_node round-trips — research_agent_node mirrors this same
+    condition to finalize its output once the cap is hit, so the two never
+    disagree about whether the loop is over."""
     research_messages = state.get("research_messages") or []
-    if research_messages and getattr(research_messages[-1], "tool_calls", None):
+    has_pending_tool_calls = bool(
+        research_messages and getattr(research_messages[-1], "tool_calls", None)
+    )
+    iterations = state.get("research_tool_iterations", 0)
+    if has_pending_tool_calls and iterations < MAX_RESEARCH_TOOL_ITERATIONS:
         return "research_tools_node"
     return "content_strategist"
 
