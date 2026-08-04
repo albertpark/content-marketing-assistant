@@ -51,9 +51,13 @@ class AgentState(TypedDict):
     research_findings: list[SearchResult]
     # Completed research_tools_node round-trips for the current research run, anchored
     # to 0 on every fresh start by research_agent_node (same anchoring rationale as
-    # research_findings above). Caps the loop at
-    # src.core.router.MAX_RESEARCH_TOOL_ITERATIONS — see should_continue_research.
+    # research_findings above).
     research_tool_iterations: int
+    # Whether research_tool_iterations has hit settings.research_tool_iterations_cap
+    # (config/services.yaml, override via RESEARCH_TOOL_ITERATIONS_CAP) — computed by
+    # research_agent_node, read by should_continue_research to end the loop even if
+    # the model still wants to call a tool. See research_agent_node's docstring.
+    research_tool_iterations_capped: bool
     research_provider_used: str | None  # "serpapi" | "perplexity" | None
 
     # strategy
@@ -95,6 +99,7 @@ def initial_state(session_id: str, user_query: str, llm_provider: str | None = N
         research_messages=[],
         research_findings=[],
         research_tool_iterations=0,
+        research_tool_iterations_capped=False,
         research_provider_used=None,
         content_brief=None,
         blog_post=None,

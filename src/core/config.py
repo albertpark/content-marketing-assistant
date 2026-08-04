@@ -49,6 +49,7 @@ class Settings:
     max_retries: int
     backoff_seconds: float
     revision_loop_cap: int
+    research_tool_iterations_cap: int
     cache_ttl_minutes: int
     rate_limit_per_minute: int
 
@@ -120,6 +121,9 @@ def load_settings(environment: str | None = None) -> Settings:
         max_retries=int(os.getenv("MAX_RETRIES") or resilience.get("max_retries", 3)),
         backoff_seconds=float(os.getenv("BACKOFF_SECONDS") or resilience.get("backoff_seconds", 2)),
         revision_loop_cap=int(os.getenv("REVISION_LOOP_CAP") or resilience.get("revision_loop_cap", 1)),
+        research_tool_iterations_cap=int(
+            os.getenv("RESEARCH_TOOL_ITERATIONS_CAP") or resilience.get("research_tool_iterations_cap", 3)
+        ),
         cache_ttl_minutes=int(performance.get("cache_ttl_minutes", 30)),
         rate_limit_per_minute=int(performance.get("rate_limit_per_minute", 60)),
         log_level=logging_cfg.get("level", "INFO"),

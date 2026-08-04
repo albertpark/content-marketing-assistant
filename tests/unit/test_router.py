@@ -1,6 +1,6 @@
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
-from src.core.router import MAX_RESEARCH_TOOL_ITERATIONS, route_after_quality, should_continue_research
+from src.core.router import route_after_quality, should_continue_research
 
 
 def _tool_call_messages():
@@ -11,24 +11,18 @@ def _tool_call_messages():
 
 
 def test_should_continue_research_routes_to_tools_when_tool_calls_present():
-    state = {"research_messages": _tool_call_messages()}
-    assert should_continue_research(state) == "research_tools_node"
-
-
-def test_should_continue_research_routes_to_tools_when_under_cap():
-    state = {
-        "research_messages": _tool_call_messages(),
-        "research_tool_iterations": MAX_RESEARCH_TOOL_ITERATIONS - 1,
-    }
+    state = {"research_messages": _tool_call_messages(), "research_tool_iterations_capped": False}
     assert should_continue_research(state) == "research_tools_node"
 
 
 def test_should_continue_research_stops_at_cap_even_with_pending_tool_calls():
     # Regression guard: an uncapped graph-level loop would keep calling
     # research_tools_node forever if the model never stops requesting tools.
+    # research_agent_node is the one that computes this flag (see
+    # test_research_agent.py) — should_continue_research just reads it.
     state = {
         "research_messages": _tool_call_messages(),
-        "research_tool_iterations": MAX_RESEARCH_TOOL_ITERATIONS,
+        "research_tool_iterations_capped": True,
     }
     assert should_continue_research(state) == "content_strategist"
 

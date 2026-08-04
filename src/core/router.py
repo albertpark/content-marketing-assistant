@@ -21,28 +21,25 @@ from src.workflow.state_management import AgentState
 # multi-target, set of agents. What remains here are the two routing decisions that
 # genuinely are pure state reads gating a fixed edge.
 
-# Caps the research_agent <-> research_tools_node graph-level tool loop (see
-# should_continue_research and research_agent_node in src/agents/research_agent.py).
-# This is what hld.md/README document as the Research Agent's "tool loop (bidirectional,
-# capped retries)" — mirrors BaseAgent.invoke()'s historical max_tool_iterations=3
-# default, now enforced at the graph level since this loop no longer runs through
-# BaseAgent.invoke() (it uses call_once() instead, which has no cap of its own).
-MAX_RESEARCH_TOOL_ITERATIONS = 3
-
-
 def should_continue_research(state: AgentState) -> str:
     """Reads the last message in research_messages (see research_agent_node /
     research_tools_node in src/agents/research_agent.py) and decides whether the
-    tool loop needs another turn. Capped at MAX_RESEARCH_TOOL_ITERATIONS completed
-    research_tools_node round-trips — research_agent_node mirrors this same
-    condition to finalize its output once the cap is hit, so the two never
-    disagree about whether the loop is over."""
+    tool loop needs another turn.
+
+    The cap itself — settings.research_tool_iterations_cap (config/services.yaml,
+    override via RESEARCH_TOOL_ITERATIONS_CAP) — is resolved and compared by
+    research_agent_node, not here, matching this module's rule that node functions
+    own settings/config reads and conditional-edge functions stay pure state reads
+    (see route_after_quality / quality_pipeline_node for the same split). This is
+    what hld.md/README document as the Research Agent's "tool loop (bidirectional,
+    capped retries)", now enforced at the graph level since this loop runs via
+    call_once() rather than BaseAgent.invoke() (which had its own, uncapped-here,
+    max_tool_iterations)."""
     research_messages = state.get("research_messages") or []
     has_pending_tool_calls = bool(
         research_messages and getattr(research_messages[-1], "tool_calls", None)
     )
-    iterations = state.get("research_tool_iterations", 0)
-    if has_pending_tool_calls and iterations < MAX_RESEARCH_TOOL_ITERATIONS:
+    if has_pending_tool_calls and not state.get("research_tool_iterations_capped", False):
         return "research_tools_node"
     return "content_strategist"
 

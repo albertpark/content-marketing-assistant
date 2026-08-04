@@ -18,7 +18,7 @@ from langchain_core.tools import tool
 
 from src.agents.base_agent import BaseAgent
 from src.agents.prompts import RESEARCH_AGENT_PROMPT
-from src.core.router import MAX_RESEARCH_TOOL_ITERATIONS
+from src.core.config import get_settings
 from src.integrations.perplexity_client import search_perplexity
 from src.integrations.resilience import AllRetriesExhaustedError
 from src.integrations.serp_client import search_serp
@@ -76,9 +76,12 @@ async def research_agent_node(state: "AgentState") -> dict:
 
     Finalizes (sets research_provider_used/last_agent_used) either when the model
     stops requesting tools, or when research_tool_iterations has already hit
-    MAX_RESEARCH_TOOL_ITERATIONS completed round-trips — mirrors
-    should_continue_research's identical condition in src/core/router.py, so the
-    node and the router never disagree about whether the loop is over."""
+    settings.research_tool_iterations_cap completed round-trips. Also writes
+    research_tool_iterations_capped, which should_continue_research (src/core/
+    router.py) reads to decide whether the loop continues — the cap value itself
+    is resolved here, not in the router, so router.py's conditional-edge functions
+    stay pure state reads (see route_after_quality / quality_pipeline_node for the
+    same node-owns-settings split)."""
     agent = _new_agent(state.get("llm_provider"))
 
     existing = state.get("research_messages") or []
@@ -99,12 +102,13 @@ async def research_agent_node(state: "AgentState") -> dict:
     all_msgs = [*all_msgs, response]
 
     has_pending_tool_calls = bool(getattr(response, "tool_calls", None))
-    capped = has_pending_tool_calls and iterations_so_far >= MAX_RESEARCH_TOOL_ITERATIONS
+    capped = iterations_so_far >= get_settings().research_tool_iterations_cap
 
     update: dict = {
         "research_messages": all_msgs,
         "research_findings": findings_so_far,
         "research_tool_iterations": iterations_so_far,
+        "research_tool_iterations_capped": capped,
     }
     if not has_pending_tool_calls or capped:
         update["research_provider_used"] = findings_so_far[0]["source"] if findings_so_far else None
