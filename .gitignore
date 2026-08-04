@@ -14,3 +14,7 @@ src/web_app/static/generated/
 contentalchemy.db
 contentalchemy.db-wal
 contentalchemy.db-shm
+
+# Claude Code local/ephemeral state
+.claude/settings.local.json
+.claude/worktrees/
