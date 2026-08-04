@@ -9,21 +9,10 @@ from typing import TYPE_CHECKING
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from src.agents.base_agent import BaseAgent
+from src.agents.prompts import LINKEDIN_WRITER_PROMPT
 
 if TYPE_CHECKING:
     from src.workflow.state_management import AgentState
-
-_SYSTEM_PROMPT = """You are the LinkedIn Writer for ContentAlchemy. Given a \
-finished blog post, write a short-form LinkedIn post that hooks readers \
-with a compelling narrative and links back to the blog. Respond with ONLY a \
-JSON object, no other text:
-{"text": "...", "hashtags": ["...", "..."]}
-
-- text: an attention-grabbing hook as the first line, 3-4 short paragraphs \
-  total, ending with a link back to the blog post (use the provided link \
-  exactly, verbatim)
-- hashtags: 2-4 relevant hashtags, each starting with #
-- Keep the whole post under 1300 characters (LinkedIn's practical sweet spot)."""
 
 _JSON_PATTERN = re.compile(r"\{.*\}", re.DOTALL)
 
@@ -51,7 +40,7 @@ class LinkedInWriterAgent(BaseAgent):
             agent_name="linkedin_writer",
             provider=provider,
             temperature=0.7,
-            system_prompt=_SYSTEM_PROMPT,
+            system_prompt=LINKEDIN_WRITER_PROMPT,
             debug=debug,
         )
 

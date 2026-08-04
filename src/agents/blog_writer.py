@@ -9,20 +9,10 @@ from typing import TYPE_CHECKING
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from src.agents.base_agent import BaseAgent
+from src.agents.prompts import BLOG_WRITER_PROMPT
 
 if TYPE_CHECKING:
     from src.workflow.state_management import AgentState
-
-_SYSTEM_PROMPT = """You are the Blog Writer for ContentAlchemy. Given a content \
-brief, write a full SEO-optimized blog post. Respond with ONLY a JSON object, no \
-other text:
-{"title": "...", "body_markdown": "...", "meta_description": "...", \
-"headers": ["...", "..."]}
-
-- meta_description: 150-160 characters
-- body_markdown: the full post body in Markdown, using the headers above as H2 \
-  sections, naturally incorporating the brief's target_keywords
-- Aim for at least 400 words in body_markdown."""
 
 _JSON_PATTERN = re.compile(r"\{.*\}", re.DOTALL)
 
@@ -58,7 +48,7 @@ class BlogWriterAgent(BaseAgent):
             agent_name="blog_writer",
             provider=provider,
             temperature=0.6,
-            system_prompt=_SYSTEM_PROMPT,
+            system_prompt=BLOG_WRITER_PROMPT,
             debug=debug,
         )
 

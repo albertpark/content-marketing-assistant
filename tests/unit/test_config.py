@@ -7,6 +7,7 @@ _ENV_VARS_TO_CLEAR = (
     "ANTHROPIC_MODEL",
     "PERPLEXITY_MODEL",
     "REVISION_LOOP_CAP",
+    "RESEARCH_TOOL_ITERATIONS_CAP",
     "MAX_RETRIES",
     "BACKOFF_SECONDS",
     "SESSION_STORE_URL",
@@ -56,6 +57,17 @@ def test_revision_loop_cap_env_override(monkeypatch):
 def test_revision_loop_cap_default_from_yaml():
     settings = load_settings("development")
     assert settings.revision_loop_cap == 1
+
+
+def test_research_tool_iterations_cap_env_override(monkeypatch):
+    monkeypatch.setenv("RESEARCH_TOOL_ITERATIONS_CAP", "7")
+    settings = load_settings("development")
+    assert settings.research_tool_iterations_cap == 7
+
+
+def test_research_tool_iterations_cap_default_from_yaml():
+    settings = load_settings("development")
+    assert settings.research_tool_iterations_cap == 3
 
 
 def test_production_session_store_defaults_to_postgres():

@@ -1,50 +1,51 @@
-"""Orchestrator: classifies user intent and dispatches to the appropriate agent."""
+"""Orchestrator: classifies user intent and dispatches to agent(s) via LangGraph Send()."""
 
 from __future__ import annotations
 
-import json
-import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from langchain_core.messages import HumanMessage, SystemMessage
+from langgraph.types import Command, Send
+from pydantic import BaseModel, Field
 
 from src.agents.base_agent import BaseAgent
+from src.agents.prompts import ORCHESTRATOR_PROMPT
 
 if TYPE_CHECKING:
     from src.workflow.state_management import AgentState
 
-_SYSTEM_PROMPT = """You are the Orchestrator for ContentAlchemy, a content-marketing \
-assistant. Given the user's latest message and whether a blog/LinkedIn post/image \
-already exist for this session, decide:
+_NODE_MAP = {
+    "research": "research_agent",
+    "blog": "blog_writer",
+    "linkedin": "linkedin_writer",
+    "image": "image_generator",
+    "package": "synthesizer",
+}
 
-- intent: "new_content" (start a fresh research-to-content run) or "refinement" \
-  (the user wants to change something that already exists)
-- route: exactly one of "research", "blog", "linkedin", "image", "package"
-  - "research": start a brand-new content run from scratch
-  - "blog": regenerate the blog post (and downstream LinkedIn post/image) from the \
-    existing brief/research
-  - "linkedin": regenerate only the LinkedIn post from the existing blog
-  - "image": regenerate only the image from the existing blog
-  - "package": just re-assemble the existing blog/LinkedIn/image into a package
-
-Respond with ONLY a JSON object, no other text: {"intent": "...", "route": "..."}"""
-
-_VALID_ROUTES = {"research", "blog", "linkedin", "image", "package"}
-_JSON_PATTERN = re.compile(r"\{.*\}", re.DOTALL)
+# Checked in this priority order: any of these three can't run alongside anything
+# else in the pipeline (research/blog/package each need the full downstream chain,
+# or none of it, to themselves). Only linkedin+image are genuinely parallel-compatible
+# — both only depend on an existing blog_post.
+_EXCLUSIVE_TARGETS = ("research", "blog", "package")
 
 
-def _parse_decision(raw: str) -> dict:
-    match = _JSON_PATTERN.search(raw or "")
-    if not match:
-        return {"intent": "new_content", "route": "research"}
-    try:
-        parsed = json.loads(match.group())
-    except json.JSONDecodeError:
-        return {"intent": "new_content", "route": "research"}
-    route = parsed.get("route")
-    if route not in _VALID_ROUTES:
-        route = "research"
-    return {"intent": parsed.get("intent", "new_content"), "route": route}
+class OrchestratorDecision(BaseModel):
+    """The orchestrator's routing decision."""
+
+    intent: Literal["new_content", "refinement"]
+    targets: list[Literal["research", "blog", "linkedin", "image", "package"]] = Field(
+        description="One or more of research/blog/linkedin/image/package. "
+        "linkedin and image may be combined in one turn; every other target must stand alone.",
+        min_length=1,
+    )
+
+
+def _normalize_targets(targets: list[str]) -> list[str]:
+    for exclusive in _EXCLUSIVE_TARGETS:
+        if exclusive in targets:
+            return [exclusive]
+    parallel = [t for t in targets if t in ("linkedin", "image")]
+    return parallel or ["research"]
 
 
 class OrchestratorAgent(BaseAgent):
@@ -53,11 +54,11 @@ class OrchestratorAgent(BaseAgent):
             agent_name="orchestrator",
             provider=provider,
             temperature=0,
-            system_prompt=_SYSTEM_PROMPT,
+            system_prompt=ORCHESTRATOR_PROMPT,
             debug=debug,
         )
 
-    async def run(self, state: "AgentState") -> dict:
+    async def decide(self, state: "AgentState") -> OrchestratorDecision:
         has_blog = state.get("blog_post") is not None
         has_linkedin = state.get("linkedin_post") is not None
         has_image = bool(state.get("image_assets"))
@@ -68,22 +69,33 @@ class OrchestratorAgent(BaseAgent):
             f"Existing LinkedIn post: {has_linkedin}\n"
             f"Existing image: {has_image}"
         )
-        response = await self.invoke(
-            [SystemMessage(content=self.system_prompt), HumanMessage(content=context)]
+        raw = await self.invoke_structured(
+            [SystemMessage(content=self.system_prompt), HumanMessage(content=context)],
+            OrchestratorDecision,
         )
-        decision = _parse_decision(response.content)
+        targets = _normalize_targets(raw.targets)
 
         # Safety net: never route straight to a refinement target for content that
         # doesn't exist yet, regardless of what the model decided.
         if not has_blog:
-            decision["route"] = "research"
+            targets = ["research"]
 
-        return {
-            "intent": decision["intent"],
-            "route": decision["route"],
-            "last_agent_used": "orchestrator",
-        }
+        return OrchestratorDecision(intent=raw.intent, targets=targets)
 
 
-async def orchestrator_node(state: "AgentState") -> dict:
-    return await OrchestratorAgent(provider=state.get("llm_provider")).run(state)
+async def orchestrator_node(
+    state: "AgentState",
+) -> Command[Literal["research_agent", "blog_writer", "linkedin_writer", "image_generator", "synthesizer"]]:
+    decision = await OrchestratorAgent(provider=state.get("llm_provider")).decide(state)
+
+    dispatch_state = dict(state)
+    if "research" in decision.targets:
+        # Reset the tool-loop buffer before Send()ing into a fresh research run — see
+        # AgentState.research_messages's docstring for why this matters.
+        dispatch_state["research_messages"] = []
+
+    sends = [Send(_NODE_MAP[target], dispatch_state) for target in decision.targets]
+    return Command(
+        goto=sends,
+        update={"intent": decision.intent, "route": decision.targets, "last_agent_used": "orchestrator"},
+    )

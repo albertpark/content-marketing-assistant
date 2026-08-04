@@ -1,27 +1,52 @@
 import json
 
 import pytest
+from langchain_core.messages import AIMessage
 
 from src.agents.base_agent import BaseAgent
+from src.agents.query_handler import OrchestratorDecision
 from src.core import config as config_module
 from src.workflow.langgraph_workflow import build_graph
 from src.workflow.state_management import initial_state
 
 
-class _FakeAIMessage:
+class _FakeAIMessage(AIMessage):
+    # A real AIMessage subclass (not a bare stand-in) — research_agent_node's
+    # response now lands in the checkpointed research_messages field, which the
+    # checkpointer serializes after every step, so it must be a real, serializable
+    # LangChain message, not just something that quacks like one.
     def __init__(self, content, tool_calls=None):
-        self.content = content
-        self.tool_calls = tool_calls or []
+        super().__init__(content=content, tool_calls=tool_calls or [])
+
+
+class _FakeStructuredModel:
+    """Stands in for llm.with_structured_output(schema): returns the canned
+    Pydantic instance directly, same as a real structured-output call would."""
+
+    def __init__(self, decision):
+        self._decision = decision
+
+    async def ainvoke(self, _messages):
+        return self._decision
+
+    def invoke(self, _messages):
+        return self._decision
 
 
 class _FakeChatModel:
-    """Stands in for ChatOpenAI: same bind_tools/(a)invoke surface, canned content."""
+    """Stands in for ChatOpenAI: same bind_tools/with_structured_output/(a)invoke
+    surface, canned content. `content` is a plain string for every agent except the
+    orchestrator, which only ever calls with_structured_output — there `content` is
+    an OrchestratorDecision instance (see ORCHESTRATOR_DECISION below)."""
 
     def __init__(self, content):
         self._content = content
 
     def bind_tools(self, _tools):
         return self
+
+    def with_structured_output(self, _schema):
+        return _FakeStructuredModel(self._content)
 
     async def ainvoke(self, _messages):
         return _FakeAIMessage(self._content)
@@ -30,7 +55,7 @@ class _FakeChatModel:
         return _FakeAIMessage(self._content)
 
 
-ORCHESTRATOR_RESPONSE = json.dumps({"intent": "new_content", "route": "research"})
+ORCHESTRATOR_DECISION = OrchestratorDecision(intent="new_content", targets=["research"])
 RESEARCH_RESPONSE = "Research summary: this topic has strong market interest."
 STRATEGIST_RESPONSE = json.dumps(
     {
@@ -79,7 +104,7 @@ def _patch_agent_llms(monkeypatch, blog_response: str):
     # BaseAgent._llm_for — keyed by agent_name, the real identity signal
     # (unlike temperature, which only incidentally differs per agent today).
     responses = {
-        "orchestrator": ORCHESTRATOR_RESPONSE,
+        "orchestrator": ORCHESTRATOR_DECISION,
         "research_agent": RESEARCH_RESPONSE,
         "content_strategist": STRATEGIST_RESPONSE,
         "blog_writer": blog_response,

@@ -11,9 +11,9 @@ from src.agents.content_strategist import content_strategist_node
 from src.agents.image_generator import image_generator_node
 from src.agents.linkedin_writer import linkedin_writer_node
 from src.agents.query_handler import orchestrator_node
-from src.agents.research_agent import research_agent_node
+from src.agents.research_agent import research_agent_node, research_tools_node
 from src.core.config import get_settings
-from src.core.router import route_after_orchestrator, route_after_quality
+from src.core.router import route_after_quality, should_continue_research
 from src.utils.quality_validation import quality_pipeline_node
 from src.workflow.state_management import AgentState, get_checkpointer
 from src.workflow.synthesizer import synthesizer_node
@@ -34,6 +34,7 @@ def build_graph(checkpointer: BaseCheckpointSaver | None = None) -> CompiledStat
 
     workflow.add_node("orchestrator", orchestrator_node)
     workflow.add_node("research_agent", research_agent_node)
+    workflow.add_node("research_tools_node", research_tools_node)
     workflow.add_node("content_strategist", content_strategist_node)
     workflow.add_node("blog_writer", blog_writer_node)
     workflow.add_node("linkedin_writer", linkedin_writer_node)
@@ -42,20 +43,20 @@ def build_graph(checkpointer: BaseCheckpointSaver | None = None) -> CompiledStat
     workflow.add_node("quality_pipeline", quality_pipeline_node)
 
     workflow.add_edge(START, "orchestrator")
+    # orchestrator_node dispatches to one or more downstream nodes itself, via
+    # Command(goto=[Send(...)]) — see src/agents/query_handler.py. No outgoing
+    # conditional-edge map is needed here.
+
+    # research_agent <-> research_tools_node: graph-level tool loop (see
+    # should_continue_research), replacing the in-process loop every other agent
+    # still uses via BaseAgent.invoke().
     workflow.add_conditional_edges(
-        "orchestrator",
-        route_after_orchestrator,
-        {
-            "research": "research_agent",
-            "strategy": "content_strategist",
-            "blog": "blog_writer",
-            "linkedin": "linkedin_writer",
-            "image": "image_generator",
-            "package": "synthesizer",
-            "end": END,
-        },
+        "research_agent",
+        should_continue_research,
+        {"research_tools_node": "research_tools_node", "content_strategist": "content_strategist"},
     )
-    workflow.add_edge("research_agent", "content_strategist")
+    workflow.add_edge("research_tools_node", "research_agent")
+
     workflow.add_edge("content_strategist", "blog_writer")
 
     # Fan-out: both edges originate from blog_writer, so LangGraph's Pregel

@@ -9,15 +9,10 @@ from typing import TYPE_CHECKING
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from src.agents.base_agent import BaseAgent
+from src.agents.prompts import CONTENT_STRATEGIST_PROMPT
 
 if TYPE_CHECKING:
     from src.workflow.state_management import AgentState
-
-_SYSTEM_PROMPT = """You are the Content Strategist for ContentAlchemy. Given \
-research findings on a topic, produce a structured content brief for the writers \
-who will turn it into a blog post. Respond with ONLY a JSON object, no other text:
-{"angle": "...", "outline": ["...", "..."], "key_points": ["...", "..."], \
-"target_keywords": ["...", "..."]}"""
 
 _JSON_PATTERN = re.compile(r"\{.*\}", re.DOTALL)
 
@@ -44,7 +39,7 @@ class ContentStrategistAgent(BaseAgent):
             agent_name="content_strategist",
             provider=provider,
             temperature=0.4,
-            system_prompt=_SYSTEM_PROMPT,
+            system_prompt=CONTENT_STRATEGIST_PROMPT,
             debug=debug,
         )
 

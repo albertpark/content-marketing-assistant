@@ -14,6 +14,7 @@ resilience:
   max_retries: 3
   backoff_seconds: 2
   revision_loop_cap: 1   # override via REVISION_LOOP_CAP env var
+  research_tool_iterations_cap: 3   # override via RESEARCH_TOOL_ITERATIONS_CAP env var
 
 performance:
   cache_ttl_minutes: 30
