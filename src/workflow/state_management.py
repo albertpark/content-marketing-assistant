@@ -35,11 +35,19 @@ class AgentState(TypedDict):
 
     # orchestrator / routing
     intent: str | None  # "new_content" | "refinement" | "research_only"
-    route: str | None
+    route: list[str] | None  # the target node(s) the orchestrator dispatched to via Send()
     last_agent_used: str | None
     llm_provider: str | None  # "openai" | "anthropic" | "gemini"; locked for the session
 
     # research
+    # Graph-level tool-loop buffer for research_agent <-> research_tools_node (see
+    # src/agents/research_agent.py). Deliberately NOT an add_messages-reducer channel
+    # (unlike `messages`): each write is a full replacement of the whole list, so a
+    # fresh research run (reset to [] by the orchestrator's Send() payload — see
+    # query_handler.py) never has old turns' tool-loop history bleed back in. An
+    # add_messages reducer would instead merge onto whatever the checkpointer already
+    # had for this key, defeating that reset.
+    research_messages: list[BaseMessage]
     research_findings: list[SearchResult]
     research_provider_used: str | None  # "serpapi" | "perplexity" | None
 
@@ -79,6 +87,7 @@ def initial_state(session_id: str, user_query: str, llm_provider: str | None = N
         route=None,
         last_agent_used=None,
         llm_provider=llm_provider,
+        research_messages=[],
         research_findings=[],
         research_provider_used=None,
         content_brief=None,

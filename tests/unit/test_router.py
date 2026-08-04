@@ -1,13 +1,32 @@
-from src.core.router import route_after_orchestrator, route_after_quality
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+
+from src.core.router import route_after_quality, should_continue_research
 
 
-def test_route_after_orchestrator_known_route():
-    assert route_after_orchestrator({"route": "blog"}) == "blog"
+def test_should_continue_research_routes_to_tools_when_tool_calls_present():
+    state = {
+        "research_messages": [
+            HumanMessage(content="research this"),
+            AIMessage(content="", tool_calls=[{"name": "web_search", "args": {"query": "x"}, "id": "1"}]),
+        ]
+    }
+    assert should_continue_research(state) == "research_tools_node"
 
 
-def test_route_after_orchestrator_unknown_defaults_to_research():
-    assert route_after_orchestrator({"route": "nonsense"}) == "research"
-    assert route_after_orchestrator({}) == "research"
+def test_should_continue_research_routes_to_strategist_when_no_tool_calls():
+    state = {
+        "research_messages": [
+            HumanMessage(content="research this"),
+            ToolMessage(content="results", tool_call_id="1"),
+            AIMessage(content="Here's what I found."),
+        ]
+    }
+    assert should_continue_research(state) == "content_strategist"
+
+
+def test_should_continue_research_handles_empty_buffer():
+    assert should_continue_research({}) == "content_strategist"
+    assert should_continue_research({"research_messages": []}) == "content_strategist"
 
 
 def test_route_after_quality_pass():

@@ -78,7 +78,11 @@ _NODE_INFO: dict[str, dict[str, str]] = {
     "orchestrator": {"label": "Orchestrator", "detail": "LLM — routes the request"},
     "research_agent": {
         "label": "Research Agent",
-        "detail": "LLM + web_search tool (SerpAPI → Perplexity fallback)",
+        "detail": "LLM — decides what to search next",
+    },
+    "research_tools_node": {
+        "label": "Research Tools",
+        "detail": "Executes web_search (SerpAPI → Perplexity fallback), no LLM call",
     },
     "content_strategist": {"label": "Content Strategist", "detail": "LLM — builds the content brief"},
     "blog_writer": {"label": "Blog Writer", "detail": "LLM — drafts the blog post"},

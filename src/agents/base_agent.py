@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, TypeVar
 
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from langchain_core.tools import BaseTool
+from pydantic import BaseModel
 
 from src.integrations import llm_client
 from src.integrations.resilience import AllRetriesExhaustedError, ProviderError, with_retry
@@ -15,6 +16,8 @@ if TYPE_CHECKING:
     from src.workflow.state_management import AgentState
 
 logger = logging.getLogger(__name__)
+
+_SchemaT = TypeVar("_SchemaT", bound=BaseModel)
 
 
 @with_retry(retry_on=(ProviderError,))
@@ -33,6 +36,21 @@ async def _invoke_one(llm: Any, conversation: list[BaseMessage]) -> AIMessage:
         if hasattr(llm, "ainvoke"):
             return await llm.ainvoke(conversation)
         return llm.invoke(conversation)
+    except ProviderError:
+        raise
+    except Exception as exc:
+        raise ProviderError(str(exc)) from exc
+
+
+@with_retry(retry_on=(ProviderError,))
+async def _invoke_one_structured(llm: Any, conversation: list[BaseMessage], schema: type[_SchemaT]) -> _SchemaT:
+    """Structured-output counterpart to _invoke_one: same broad-catch rationale
+    applies (see _invoke_one's docstring)."""
+    try:
+        structured_llm = llm.with_structured_output(schema)
+        if hasattr(structured_llm, "ainvoke"):
+            return await structured_llm.ainvoke(conversation)
+        return structured_llm.invoke(conversation)
     except ProviderError:
         raise
     except Exception as exc:
@@ -101,11 +119,28 @@ class BaseAgent:
                 conversation.append(await self._execute_tool(tool_call))
         return response
 
+    async def call_once(self, conversation: list[BaseMessage]) -> AIMessage:
+        """A single provider-fallback LLM call with no tool loop — for agents whose
+        tool loop is implemented at the graph level (agent_node ⇄ tools_node
+        conditional edges) rather than in-process via invoke()."""
+        return await self._ainvoke_llm(conversation)
+
+    async def invoke_structured(self, messages: list[BaseMessage], schema: type[_SchemaT]) -> _SchemaT:
+        """Same provider-fallback chain as invoke()/call_once(), but binds
+        with_structured_output(schema) on each provider's model and returns a
+        validated instance of schema directly instead of an AIMessage."""
+        return await self._with_fallback_chain(
+            lambda llm: _invoke_one_structured(llm, messages, schema)
+        )
+
     async def _ainvoke_llm(self, conversation: list[BaseMessage]) -> AIMessage:
+        return await self._with_fallback_chain(lambda llm: _invoke_one(llm, conversation))
+
+    async def _with_fallback_chain(self, call_fn: Callable[[Any], Awaitable[Any]]) -> Any:
         last_exc: Exception | None = None
         for provider in self._provider_chain:
             try:
-                return await _invoke_one(self._llm_for(provider), conversation)
+                return await call_fn(self._llm_for(provider))
             except AllRetriesExhaustedError as exc:
                 last_exc = exc
                 logger.warning(
