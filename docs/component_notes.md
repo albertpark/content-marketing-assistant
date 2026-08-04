@@ -36,9 +36,11 @@ agent logic — this is also the fallback path if one provider is down.
 ---
 
 **Content Strategist**
-Turns raw research into a structured brief — angle, outline, keywords.
+Turns raw research into a structured brief — angle, outline, keywords, and an image
+brief.
 > "This is the hand-off point between 'here's what we found' and 'here's what to
-> write.'"
+> write' — and it also tells the Image Generator what the header image should
+> actually depict, not just its title."
 
 ---
 
@@ -59,11 +61,16 @@ Short-form post, hook + link back to the blog. Runs parallel to Image Generator.
 
 ---
 
-**Image Generator** ⇄ **Image tools**
-Visual generated from the finished blog, with a fallback chain (GPT Image → fallback →
-placeholder).
-> "If the primary image provider fails or times out, we don't just show a broken
-> image — there's a capped retry loop and a fallback provider before we give up."
+**Image Generator** → **Image tools**
+Its own agent with a dedicated system prompt: turns the Content Strategist's image
+brief + the finished blog title into one image-generation prompt, then calls Image
+tools' fallback chain (GPT Image → fallback → placeholder).
+> "This has its own system prompt so every image comes out in the same house style —
+> composition, mood, no stray embedded text — instead of drifting per topic. If the
+> primary image provider fails or times out, we don't just show a broken image —
+> there's a fallback provider before we give up."
+Q: Is this a tool loop like Research Agent? → No — one LLM call to write the image
+prompt, one call to generate it. No back-and-forth tool calling.
 
 ---
 
@@ -121,7 +128,8 @@ new provider only needs to happen once here.
 - **Conditional edge (revision loop)** — dashed arrow, taken only on a failed quality
   gate.
 - **Tool loop (bidirectional, capped retries)** — agent ⇄ tool, e.g. Research Agent ⇄
-  Search tools, Image Generator ⇄ Image tools.
+  Search tools (the LLM decides when to call the tool and loops). Image Generator →
+  Image tools is a single-shot call, not this pattern.
 
 ## Suggested demo narration order
 

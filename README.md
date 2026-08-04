@@ -380,7 +380,8 @@ punchier") route correctly without re-explaining the topic.
 ### Content Strategist
 
 **Purpose:** turns raw research into a structured brief — angle, outline, key points,
-target keywords — consumed by the Blog Writer.
+target keywords, and an image brief — consumed by the Blog Writer and, later, the
+Image Generator.
 
 ### Blog Writer
 
@@ -401,9 +402,11 @@ hook + CTA, line-break formatting for readability.
 
 ### Image Generator
 
-**Purpose:** visual generated from the finished blog content, with prompt
-optimization and a fallback chain (primary provider → secondary → placeholder) so a
-provider outage never blocks the pipeline.
+**Purpose:** its own agent with a dedicated system prompt, so generated images follow
+a consistent house style. Combines the Content Strategist's image brief (subject
+matter/mood) with the finished blog's title to write an image-generation prompt, then
+calls the image API through a fallback chain (primary provider → secondary →
+placeholder) so a provider outage never blocks the pipeline.
 
 ---
 

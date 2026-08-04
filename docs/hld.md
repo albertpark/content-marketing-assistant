@@ -21,11 +21,12 @@ but are required for the system to be production-grade.
 Interface
   → Orchestrator (Query Handler + Coordinator)
     → Research Agent  ⇄ Search tools (SERP + Perplexity)
-    → Content Strategist
+    → Content Strategist                (angle/outline/keywords + image brief)
     → Blog Writer                      (runs first — full SEO post)
         ├→ LinkedIn Writer             (hook + link to blog)
-        └→ Image Generator ⇄ Image tools (GPT Image + fallback)
-                (from finished blog)
+        └→ Image Generator → Image tools (GPT Image + fallback)
+                (image brief from Content Strategist + finished blog title —
+                 both already in shared graph state, no separate edge needed)
     → Synthesizer                      (assembles final cross-linked package)
     → Quality & Enhancement Pipeline   (structural · SEO · brand · facts)
         ├→ Content Dashboard           (review, edit, approve)
@@ -34,8 +35,9 @@ Interface
 
 Key sequencing decision: **Blog Writer runs before LinkedIn/Image**, because the
 LinkedIn post links back to the blog and the image is generated from the finished blog
-content, not from the raw brief. LinkedIn and Image generation then run as parallel
-branches off the Blog Writer output and rejoin at the Synthesizer.
+title (plus the Content Strategist's image brief), not from the raw brief alone.
+LinkedIn and Image generation then run as parallel branches off the Blog Writer output
+and rejoin at the Synthesizer.
 
 The dashed feedback edge from the Quality & Enhancement Pipeline back up to the
 Blog Writer / Content Strategist area is the **revision loop**: failed quality gates
@@ -74,9 +76,12 @@ failing the whole run.
 
 ### Content Strategist
 - **Purpose:** formats raw research into a structured content brief (angle, outline,
-  key points, target keywords) that downstream writers consume.
+  key points, target keywords, and an image brief) that downstream writers — and the
+  Image Generator — consume.
 - **In:** research findings.
-- **Out:** brief → Blog Writer.
+- **Out:** brief → Blog Writer directly; the brief's `image_brief` field also reaches
+  the Image Generator via shared graph state (no separate edge — state persists across
+  the whole run, so any downstream node can read it once written).
 
 ### Blog Writer
 - **Purpose:** produces the full long-form, SEO-optimized post. Runs first because
@@ -91,11 +96,18 @@ failing the whole run.
 - **Out:** LinkedIn post draft → Synthesizer.
 
 ### Image Generator
-- **Purpose:** produces a visual derived from the finished blog (not the raw brief),
-  so imagery matches the actual published content.
-- **In:** finished blog post.
+- **Purpose:** produces a visual guided by the Content Strategist's `image_brief`
+  (subject matter/mood) plus the finished blog's title, using its own system prompt
+  so every generated image follows a consistent house style (composition, mood, no
+  embedded text/logos) rather than a title-only guess.
+- **In:** `content_brief.image_brief` (from Content Strategist) + finished blog post
+  title — both already present in shared graph state by the time this node runs.
 - **Out:** image asset(s) → Synthesizer.
-- **Tool loop:** bidirectional, capped-retry loop against **Image tools**.
+- **Flow:** one LLM call (its own system prompt) turns the image brief + blog title
+  into a single image-generation prompt; that prompt then makes one call into **Image
+  tools**' provider-fallback chain. This is *not* a bidirectional tool loop like
+  Research Agent's — there's no LLM-driven back-and-forth, just prompt synthesis
+  followed by a single generation call (with its own internal retry/fallback).
 
 ### Image tools (GPT Image + fallback)
 - **Purpose:** pluggable image backends with a fallback chain (primary generator →
@@ -167,7 +179,7 @@ failing the whole run.
 |---|---|
 | Fixed edge (solid arrow) | Deterministic hand-off, always taken. |
 | Conditional edge (dashed, revision loop) | Taken only when the Quality & Enhancement Pipeline fails a gate; routes back upstream for revision, capped retries. |
-| Tool loop (bidirectional, capped retries) | Agent ⇄ tool call-and-response (Search tools, Image tools), retried up to a cap before falling back or failing gracefully. |
+| Tool loop (bidirectional, capped retries) | Research Agent ⇄ Search tools: the LLM decides when/how to call the tool, looping until it stops or a cap is hit. (Image Generator's call into Image tools is a single-shot, provider-fallback call — not this pattern; see the Image Generator component note.) |
 
 ## 5. Rubric cross-reference
 
