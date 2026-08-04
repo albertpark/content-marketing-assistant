@@ -56,3 +56,254 @@
 2026-08-02 19:21:10.769 Please replace `st.components.v1.html` with `st.iframe`.
 
 `st.components.v1.html` will be removed after 2026-06-01.
+2026-08-02 23:33:27.947 Please replace `st.components.v1.html` with `st.iframe`.
+
+`st.components.v1.html` will be removed after 2026-06-01.
+2026-08-03 09:11:14.900 Uncaught app execution
+Traceback (most recent call last):
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 807, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 438, in <module>
+    main()
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 384, in main
+    _render_sidebar(registry)
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 249, in _render_sidebar
+    for session in registry.list_sessions():
+                   ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\workflow\state_management.py", line 231, in list_sessions
+    cur = self._conn.execute(
+          ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\psycopg\connection.py", line 300, in execute
+    raise ex.with_traceback(None)
+psycopg.OperationalError: consuming input failed: server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+2026-08-03 09:11:41.245 Uncaught app execution
+Traceback (most recent call last):
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 807, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 438, in <module>
+    main()
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 384, in main
+    _render_sidebar(registry)
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 249, in _render_sidebar
+    for session in registry.list_sessions():
+                   ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\workflow\state_management.py", line 231, in list_sessions
+    cur = self._conn.execute(
+          ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\psycopg\connection.py", line 300, in execute
+    raise ex.with_traceback(None)
+psycopg.OperationalError: the connection is closed
+2026-08-03 09:11:51.803 Uncaught app execution
+Traceback (most recent call last):
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 807, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 438, in <module>
+    main()
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 384, in main
+    _render_sidebar(registry)
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 249, in _render_sidebar
+    for session in registry.list_sessions():
+                   ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\workflow\state_management.py", line 231, in list_sessions
+    cur = self._conn.execute(
+          ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\psycopg\connection.py", line 300, in execute
+    raise ex.with_traceback(None)
+psycopg.OperationalError: the connection is closed
+2026-08-03 09:17:28.936 Uncaught app execution
+Traceback (most recent call last):
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 807, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 438, in <module>
+    main()
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 384, in main
+    _render_sidebar(registry)
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 249, in _render_sidebar
+    for session in registry.list_sessions():
+                   ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\workflow\state_management.py", line 231, in list_sessions
+    "VALUES (?, ?, ?, ?, 1) ON CONFLICT (session_id) DO NOTHING"
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\psycopg\connection.py", line 300, in execute
+    raise ex.with_traceback(None)
+psycopg.OperationalError: the connection is closed
+2026-08-03 09:20:09.555 Uncaught app execution
+Traceback (most recent call last):
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 807, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 438, in <module>
+    main()
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 384, in main
+    _render_sidebar(registry)
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 249, in _render_sidebar
+    for session in registry.list_sessions():
+                   ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\workflow\state_management.py", line 231, in list_sessions
+    "VALUES (?, ?, ?, ?, 1) ON CONFLICT (session_id) DO NOTHING"
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\psycopg\connection.py", line 300, in execute
+    raise ex.with_traceback(None)
+psycopg.OperationalError: the connection is closed
+2026-08-03 10:33:25.842 Uncaught app execution
+Traceback (most recent call last):
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 807, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 438, in <module>
+    main()
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 384, in main
+    _render_sidebar(registry)
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 249, in _render_sidebar
+    for session in registry.list_sessions():
+                   ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\workflow\state_management.py", line 231, in list_sessions
+    "VALUES (?, ?, ?, ?, 1) ON CONFLICT (session_id) DO NOTHING"
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\psycopg\connection.py", line 300, in execute
+    raise ex.with_traceback(None)
+psycopg.OperationalError: the connection is closed
+2026-08-03 10:33:36.483 Uncaught app execution
+Traceback (most recent call last):
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 807, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 438, in <module>
+    main()
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 384, in main
+    _render_sidebar(registry)
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 249, in _render_sidebar
+    for session in registry.list_sessions():
+                   ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\workflow\state_management.py", line 231, in list_sessions
+    "VALUES (?, ?, ?, ?, 1) ON CONFLICT (session_id) DO NOTHING"
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\psycopg\connection.py", line 300, in execute
+    raise ex.with_traceback(None)
+psycopg.OperationalError: the connection is closed
+2026-08-03 11:16:10.810 Uncaught app execution
+Traceback (most recent call last):
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 807, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 438, in <module>
+    main()
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 384, in main
+    _render_sidebar(registry)
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 249, in _render_sidebar
+    for session in registry.list_sessions():
+                   ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\workflow\state_management.py", line 231, in list_sessions
+    "VALUES (?, ?, ?, ?, 1) ON CONFLICT (session_id) DO NOTHING"
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\psycopg\connection.py", line 300, in execute
+    raise ex.with_traceback(None)
+psycopg.OperationalError: the connection is closed
+2026-08-03 11:16:29.354 Uncaught app execution
+Traceback (most recent call last):
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 807, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 438, in <module>
+    main()
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 384, in main
+    _render_sidebar(registry)
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 249, in _render_sidebar
+    for session in registry.list_sessions():
+                   ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\workflow\state_management.py", line 231, in list_sessions
+    "VALUES (?, ?, ?, ?, 1) ON CONFLICT (session_id) DO NOTHING"
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\psycopg\connection.py", line 300, in execute
+    raise ex.with_traceback(None)
+psycopg.OperationalError: the connection is closed
+2026-08-03 11:17:08.584 Uncaught app execution
+Traceback (most recent call last):
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 807, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 438, in <module>
+    main()
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 384, in main
+    _render_sidebar(registry)
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 249, in _render_sidebar
+    for session in registry.list_sessions():
+                   ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\workflow\state_management.py", line 231, in list_sessions
+    "VALUES (?, ?, ?, ?, 1) ON CONFLICT (session_id) DO NOTHING"
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\psycopg\connection.py", line 300, in execute
+    raise ex.with_traceback(None)
+psycopg.OperationalError: the connection is closed
+2026-08-03 11:17:14.971 Uncaught app execution
+Traceback (most recent call last):
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 807, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 438, in <module>
+    main()
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 384, in main
+    _render_sidebar(registry)
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 249, in _render_sidebar
+    for session in registry.list_sessions():
+                   ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\workflow\state_management.py", line 231, in list_sessions
+    "VALUES (?, ?, ?, ?, 1) ON CONFLICT (session_id) DO NOTHING"
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\psycopg\connection.py", line 300, in execute
+    raise ex.with_traceback(None)
+psycopg.OperationalError: the connection is closed
+2026-08-03 11:17:34.003 Uncaught app execution
+Traceback (most recent call last):
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 807, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 438, in <module>
+    main()
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 384, in main
+    _render_sidebar(registry)
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\web_app\streamlit_app.py", line 249, in _render_sidebar
+    for session in registry.list_sessions():
+                   ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\src\workflow\state_management.py", line 231, in list_sessions
+    "VALUES (?, ?, ?, ?, 1) ON CONFLICT (session_id) DO NOTHING"
+  File "C:\Users\Expert Center\Downloads\IK ML\_Capstone-ContentMarketingAssistant\.venv\Lib\site-packages\psycopg\connection.py", line 300, in execute
+    raise ex.with_traceback(None)
+psycopg.OperationalError: the connection is closed

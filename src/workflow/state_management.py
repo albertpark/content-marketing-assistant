@@ -177,13 +177,29 @@ class SessionRegistry:
     caused by transaction-mode pooling itself, not by asyncio/event-loop
     binding, so it affects sync connections just as much."""
 
-    def __init__(self, conn: sqlite3.Connection | psycopg.Connection, backend: str):
+    def __init__(self, conn: sqlite3.Connection | psycopg.Connection, backend: str, conn_string: str | None = None):
         self._conn = conn
         self._is_postgres = backend == "postgres"
+        self._conn_string = conn_string
         self._ensure_table()
 
     def _sql(self, query: str) -> str:
         return query.replace("?", "%s") if self._is_postgres else query
+
+    def _execute(self, query: str, params: tuple = ()):
+        """Runs a query, transparently reconnecting once on a dead connection.
+        get_registry_connection()'s postgres connection is cached for the whole
+        Streamlit process lifetime (see streamlit_app.py's @st.cache_resource
+        get_registry_conn) — Supabase's pooler silently drops idle connections,
+        which otherwise permanently breaks the sidebar until the process is
+        restarted."""
+        try:
+            return self._conn.execute(query, params)
+        except psycopg.OperationalError:
+            if not self._is_postgres:
+                raise
+            self._conn = psycopg.connect(self._conn_string, autocommit=True, prepare_threshold=None)
+            return self._conn.execute(query, params)
 
     def _commit_if_needed(self) -> None:
         # The postgres connection is opened with autocommit=True; sqlite3 needs an explicit commit.
@@ -209,7 +225,7 @@ class SessionRegistry:
     def record_start(self, session_id: str, title: str) -> None:
         """Call once, on the FIRST turn of a session (mirrors initial_state())."""
         now = _utcnow()
-        self._conn.execute(
+        self._execute(
             self._sql(
                 "INSERT INTO sessions (session_id, title, created_at, updated_at, turn_count) "
                 "VALUES (?, ?, ?, ?, 1) ON CONFLICT (session_id) DO NOTHING"
@@ -220,7 +236,7 @@ class SessionRegistry:
 
     def record_turn(self, session_id: str) -> None:
         """Call on every subsequent turn (mirrors new_turn_input())."""
-        self._conn.execute(
+        self._execute(
             self._sql("UPDATE sessions SET updated_at = ?, turn_count = turn_count + 1 WHERE session_id = ?"),
             (_utcnow(), session_id),
         )
@@ -228,7 +244,7 @@ class SessionRegistry:
 
     def list_sessions(self) -> list[dict]:
         """Most-recently-updated first, for the sidebar."""
-        cur = self._conn.execute(
+        cur = self._execute(
             self._sql(
                 "SELECT session_id, title, created_at, updated_at, turn_count "
                 "FROM sessions ORDER BY updated_at DESC"
@@ -252,7 +268,7 @@ def get_registry_connection(settings: Settings) -> SessionRegistry:
         return SessionRegistry(conn, backend)
     if backend == "postgres":
         conn = psycopg.connect(settings.session_store_url, autocommit=True, prepare_threshold=None)
-        return SessionRegistry(conn, backend)
+        return SessionRegistry(conn, backend, conn_string=settings.session_store_url)
     raise ValueError(f"Session registry is not available for backend {backend!r}")
 
 

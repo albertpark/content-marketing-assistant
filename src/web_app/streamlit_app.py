@@ -5,7 +5,11 @@ from __future__ import annotations
 import asyncio
 import html
 import json
+import sys
 from datetime import datetime
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -23,16 +27,12 @@ from src.workflow.state_management import (
     open_checkpointer,
 )
 
-st.set_page_config(page_title="ContentAlchemy", page_icon="🧪", layout="wide")
+# -----------------------------------------------------------------------------
+# Set things up.
 
-# Hides just the "Record a screencast" entry from Streamlit's built-in main
-# menu, leaving Print/theme toggle/Rerun/Deploy/etc. untouched. Streamlit has
-# no official per-item toggle for this (client.toolbarMode is all-or-nothing
-# for the whole menu) — this targets the item's data-testid, which Streamlit
-# derives from its internal React key ("recordScreencast"). Unofficial: this
-# testid isn't a public API and could change in a future Streamlit version,
-# in which case this simply stops matching and the item reappears (fails
-# open, not broken).
+st.set_page_config(page_title="ContentAlchemy", page_icon="📝", layout="wide")
+
+# Hides just the "Record a screencast" from main menu
 st.markdown(
     '<style>[data-testid="stMainMenuItem-recordScreencast"] { display: none; }</style>',
     unsafe_allow_html=True,
@@ -367,7 +367,7 @@ def _render_dashboard(thread_id: str, state: dict) -> None:
 
 
 def main() -> None:
-    st.title("ContentAlchemy")
+    st.title("ContentAlchemy 📝")
     st.caption("Multi-agent content marketing assistant")
 
     settings = get_settings()

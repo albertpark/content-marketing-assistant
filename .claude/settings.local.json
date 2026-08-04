@@ -40,7 +40,14 @@
       "Bash(.venv/Scripts/python -m py_compile scripts/run_evaluation.py)",
       "Bash(git init *)",
       "Bash(.venv/Scripts/python -m pytest tests/ -q)",
-      "Bash(.venv/Scripts/python -m py_compile src/web_app/streamlit_app.py src/agents/linkedin_writer.py tests/integration/test_graph_e2e.py)"
+      "Bash(.venv/Scripts/python -m py_compile src/web_app/streamlit_app.py src/agents/linkedin_writer.py tests/integration/test_graph_e2e.py)",
+      "Bash(.venv/Scripts/python -m py_compile src/workflow/state_management.py)",
+      "Bash(.venv/Scripts/python --version)",
+      "Read(//c/Users/Expert Center/AppData/Local/Programs/Python\" 2>/dev/**)",
+      "PowerShell(Get-CimInstance *)",
+      "PowerShell(Get-NetTCPConnection *)",
+      "Bash(../../.venv/Scripts/python.exe -c ' *)",
+      "Bash(git status *)"
     ]
   }
 }
