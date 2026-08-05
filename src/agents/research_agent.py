@@ -49,6 +49,12 @@ def web_search(query: str) -> tuple[str, list[dict]]:
 _TOOLS = [web_search]
 _TOOL_MAP = {t.name: t for t in _TOOLS}
 
+# Plain text: unlike the other agents, response.content here is never JSON-parsed.
+_STATIC_FALLBACK = (
+    "Research is temporarily unavailable due to high demand. Proceeding with "
+    "general knowledge only — results may be less current than usual."
+)
+
 
 def _new_agent(provider: str | None) -> BaseAgent:
     return BaseAgent(
@@ -58,6 +64,7 @@ def _new_agent(provider: str | None) -> BaseAgent:
         system_prompt=RESEARCH_AGENT_PROMPT,
         tools=_TOOLS,
         debug=False,
+        static_fallback=_STATIC_FALLBACK,
     )
 
 

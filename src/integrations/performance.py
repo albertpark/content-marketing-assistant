@@ -8,6 +8,7 @@ import inspect
 import threading
 import time
 from collections import deque
+from functools import lru_cache
 
 from src.core.config import get_settings
 
@@ -95,6 +96,51 @@ class RateLimiter:
                 while self._timestamps and now - self._timestamps[0] > window:
                     self._timestamps.popleft()
             self._timestamps.append(now)
+
+
+class TokenBucketLimiter:
+    """Non-blocking token-bucket admission control: rejects immediately instead
+    of sleeping/queuing like RateLimiter above."""
+
+    def __init__(self, capacity: int | None = None, refill_per_minute: int | None = None):
+        self._capacity = capacity
+        self._refill_per_minute = refill_per_minute
+        self._tokens: float | None = None  # lazily seeded from settings on first use
+        self._last_refill = time.monotonic()
+        self._lock = threading.Lock()
+        self.stats = {"allowed": 0, "rejected": 0}
+
+    @property
+    def capacity(self) -> int:
+        return self._capacity or get_settings().rate_limit_burst_capacity
+
+    @property
+    def _refill_per_second(self) -> float:
+        per_minute = self._refill_per_minute or get_settings().rate_limit_per_minute
+        return per_minute / 60.0
+
+    def try_acquire(self) -> bool:
+        """Consumes and returns True if a token is available, else False (no sleep)."""
+        with self._lock:
+            if self._tokens is None:
+                self._tokens = float(self.capacity)
+            now = time.monotonic()
+            elapsed = now - self._last_refill
+            self._tokens = min(self.capacity, self._tokens + elapsed * self._refill_per_second)
+            self._last_refill = now
+            if self._tokens >= 1:
+                self._tokens -= 1
+                self.stats["allowed"] += 1
+                return True
+            self.stats["rejected"] += 1
+            return False
+
+
+@lru_cache
+def get_admission_limiter() -> TokenBucketLimiter:
+    """Process-wide singleton so admission state is shared across BaseAgent
+    instances. Call get_admission_limiter.cache_clear() to reset in tests."""
+    return TokenBucketLimiter()
 
 
 def rate_limited(calls_per_minute: int | None = None):

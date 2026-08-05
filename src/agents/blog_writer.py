@@ -16,6 +16,20 @@ if TYPE_CHECKING:
 
 _JSON_PATTERN = re.compile(r"\{.*\}", re.DOTALL)
 
+# Matches _parse_blog_post's schema so a degraded response still parses cleanly.
+_STATIC_FALLBACK = json.dumps(
+    {
+        "title": "Your post is on its way",
+        "body_markdown": (
+            "# We're experiencing high demand right now\n\n"
+            "This is a placeholder draft — our writing service is temporarily "
+            "degraded. Please retry in a few minutes for the full post."
+        ),
+        "meta_description": "Placeholder draft — full content will be available shortly.",
+        "headers": ["We're experiencing high demand right now"],
+    }
+)
+
 
 def _slugify(title: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
@@ -50,6 +64,7 @@ class BlogWriterAgent(BaseAgent):
             temperature=0.6,
             system_prompt=BLOG_WRITER_PROMPT,
             debug=debug,
+            static_fallback=_STATIC_FALLBACK,
         )
 
     async def run(self, state: "AgentState") -> dict:

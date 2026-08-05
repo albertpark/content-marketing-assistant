@@ -16,6 +16,17 @@ if TYPE_CHECKING:
 
 _JSON_PATTERN = re.compile(r"\{.*\}", re.DOTALL)
 
+# See blog_writer.py's _STATIC_FALLBACK for the JSON-matches-_parse_* rationale.
+_STATIC_FALLBACK = json.dumps(
+    {
+        "text": (
+            "We're experiencing high demand right now and couldn't generate a "
+            "fresh LinkedIn post. Please try again shortly."
+        ),
+        "hashtags": [],
+    }
+)
+
 
 def _parse_linkedin_post(raw: str) -> dict:
     match = _JSON_PATTERN.search(raw or "")
@@ -42,6 +53,7 @@ class LinkedInWriterAgent(BaseAgent):
             temperature=0.7,
             system_prompt=LINKEDIN_WRITER_PROMPT,
             debug=debug,
+            static_fallback=_STATIC_FALLBACK,
         )
 
     async def run(self, state: "AgentState") -> dict:

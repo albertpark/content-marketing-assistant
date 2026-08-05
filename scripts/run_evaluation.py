@@ -21,7 +21,12 @@ from langsmith.evaluation import aevaluate  # noqa: E402
 
 from src.core.config import get_settings  # noqa: E402
 from src.evaluation.dataset import sync_dataset  # noqa: E402
-from src.evaluation.evaluators import llm_judge_relevance, structural_gates  # noqa: E402
+from src.evaluation.evaluators import (  # noqa: E402
+    llm_judge_completeness,
+    llm_judge_hallucination,
+    llm_judge_relevance,
+    structural_gates,
+)
 from src.workflow.langgraph_workflow import build_graph  # noqa: E402
 from src.workflow.state_management import initial_state, new_session_id, open_checkpointer  # noqa: E402
 
@@ -44,6 +49,7 @@ async def _run_pipeline(user_query: str) -> dict:
         "content_package": final_state.get("content_package"),
         "blog_post": final_state.get("blog_post"),
         "quality_report": final_state.get("quality_report"),
+        "research_findings": final_state.get("research_findings"),
     }
 
 
@@ -57,11 +63,12 @@ async def main() -> None:
     results = await aevaluate(
         _target,
         data=dataset_name,
-        evaluators=[structural_gates, llm_judge_relevance],
+        evaluators=[structural_gates, llm_judge_relevance, llm_judge_hallucination, llm_judge_completeness],
         experiment_prefix="contentalchemy",
         description=(
             "End-to-end ContentAlchemy pipeline eval: deterministic structural "
-            "gates + LLM-judged relevance to the original request."
+            "gates + LLM-judged relevance, hallucination/groundedness, and "
+            "completeness against the original request."
         ),
         max_concurrency=2,
     )
