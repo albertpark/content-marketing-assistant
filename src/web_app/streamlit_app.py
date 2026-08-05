@@ -86,7 +86,7 @@ _NODE_INFO: dict[str, dict[str, str]] = {
     },
     "content_strategist": {"label": "Content Strategist", "detail": "LLM — builds the content brief"},
     "blog_writer": {"label": "Blog Writer", "detail": "LLM — drafts the blog post"},
-    "linkedin_writer": {"label": "LinkedIn Writer", "detail": "Template, no LLM call"},
+    "linkedin_writer": {"label": "LinkedIn Writer", "detail": "LLM — writes a short-form post"},
     "image_generator": {"label": "Image Generator", "detail": "OpenAI image generation (gpt-image-1-mini)"},
     "synthesizer": {"label": "Synthesizer", "detail": "Packages the content bundle, no LLM call"},
     "quality_pipeline": {"label": "Quality Pipeline", "detail": "Deterministic quality gates, no LLM call"},
