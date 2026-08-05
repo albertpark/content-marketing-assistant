@@ -79,11 +79,8 @@ Blog post:
 
 
 def llm_judge_hallucination(run: Run, example: Example) -> dict:
-    """LLM-as-judge: does the blog post stick to what the research findings
-    actually support, rather than inventing statistics or sources? Complements
-    llm_judge_relevance (on-topic) and structural_gates (structural) with a
-    groundedness signal. Requires research_findings in the run's outputs — see
-    scripts/run_evaluation.py's _run_pipeline."""
+    """LLM-as-judge: is the post grounded in research_findings, or fabricated?
+    Requires research_findings in the run's outputs (see run_evaluation.py)."""
     blog_post = (run.outputs or {}).get("blog_post") or {}
     body = blog_post.get("body_markdown", "")
     if not body:
@@ -124,10 +121,7 @@ Blog post:
 
 
 def llm_judge_completeness(run: Run, example: Example) -> dict:
-    """LLM-as-judge: does the blog post cover everything the original request
-    asked for? Complements llm_judge_relevance ("is this on-topic") with a
-    coverage signal — a post can be perfectly on-topic but only address one of
-    several things the request asked for."""
+    """LLM-as-judge: does the post cover everything the request asked for?"""
     query = (example.inputs or {}).get("user_query", "")
     blog_post = (run.outputs or {}).get("blog_post") or {}
     body = blog_post.get("body_markdown", "")

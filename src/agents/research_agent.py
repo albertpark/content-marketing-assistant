@@ -49,10 +49,7 @@ def web_search(query: str) -> tuple[str, list[dict]]:
 _TOOLS = [web_search]
 _TOOL_MAP = {t.name: t for t in _TOOLS}
 
-# Plain text, not JSON: unlike blog_writer/linkedin_writer/content_strategist,
-# research_agent's raw response.content is never JSON-parsed downstream —
-# content_strategist reads research_findings (populated by the tool call
-# itself), not this message's text.
+# Plain text: unlike the other agents, response.content here is never JSON-parsed.
 _STATIC_FALLBACK = (
     "Research is temporarily unavailable due to high demand. Proceeding with "
     "general knowledge only — results may be less current than usual."

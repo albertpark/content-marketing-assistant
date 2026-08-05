@@ -16,12 +16,7 @@ if TYPE_CHECKING:
 
 _JSON_PATTERN = re.compile(r"\{.*\}", re.DOTALL)
 
-# Served (see BaseAgent._ainvoke_llm) when the provider fallback chain is
-# exhausted and there's no cached draft to fall back to. Deliberately still
-# JSON matching _parse_blog_post's schema, so a degraded run still produces a
-# valid (if generic) blog_post rather than an empty one — and its short word
-# count will legitimately fail the quality gates, correctly routing it to
-# human review instead of shipping silently.
+# Matches _parse_blog_post's schema so a degraded response still parses cleanly.
 _STATIC_FALLBACK = json.dumps(
     {
         "title": "Your post is on its way",

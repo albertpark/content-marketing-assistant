@@ -100,11 +100,7 @@ class RateLimiter:
 
 class TokenBucketLimiter:
     """Non-blocking token-bucket admission control: rejects immediately instead
-    of sleeping/queuing like RateLimiter above. RateLimiter throttles a single
-    outbound provider call (add latency, then proceed); this instead gates
-    whether an agent-level call is attempted at all, so a rejection can trigger
-    graceful degradation (cached/static response — see BaseAgent) rather than
-    making the user wait."""
+    of sleeping/queuing like RateLimiter above."""
 
     def __init__(self, capacity: int | None = None, refill_per_minute: int | None = None):
         self._capacity = capacity
@@ -124,8 +120,7 @@ class TokenBucketLimiter:
         return per_minute / 60.0
 
     def try_acquire(self) -> bool:
-        """Non-blocking: consumes and returns True if a token is available,
-        otherwise returns False immediately (no sleep)."""
+        """Consumes and returns True if a token is available, else False (no sleep)."""
         with self._lock:
             if self._tokens is None:
                 self._tokens = float(self.capacity)
@@ -143,10 +138,8 @@ class TokenBucketLimiter:
 
 @lru_cache
 def get_admission_limiter() -> TokenBucketLimiter:
-    """Process-wide singleton. Admission control only works if state is shared
-    across calls over time — every BaseAgent is a fresh instance per graph-node
-    invocation, so the limiter can't live on it. Call
-    get_admission_limiter.cache_clear() to reset (tests do this per-test)."""
+    """Process-wide singleton so admission state is shared across BaseAgent
+    instances. Call get_admission_limiter.cache_clear() to reset in tests."""
     return TokenBucketLimiter()
 
 
