@@ -1,6 +1,6 @@
 """Runs the ContentAlchemy pipeline against the eval dataset and scores each
 result in LangSmith (structural gates + LLM-judged relevance). Requires
-LANGCHAIN_TRACING_V2=true and LANGCHAIN_API_KEY set — see .env.
+LANGSMITH_TRACING=true and LANGSMITH_API_KEY set — see .env.
 
 Usage:
     uv run python scripts/run_evaluation.py

@@ -58,11 +58,13 @@ class LinkedInWriterAgent(BaseAgent):
         response = await self.invoke(
             [SystemMessage(content=self.system_prompt), HumanMessage(content=context)]
         )
-        # Note: does NOT set last_agent_used — this node runs concurrently with
-        # image_generator (both fan out from blog_writer in the same superstep), and
-        # last_agent_used uses LangGraph's default last-value channel, which rejects
-        # two writes in the same step (InvalidUpdateError). "Last agent used" is
-        # ambiguous for a parallel step anyway.
+        # Note: does NOT set last_agent_used, unlike blog_writer. It runs alone,
+        # sequentially after blog_writer — not concurrently with image_generator,
+        # which now fans out from content_strategist directly (see
+        # langgraph_workflow.py) — so left unset here to match image_generator's
+        # sibling node feeding synthesizer, which still can't set it (that one runs
+        # concurrently with blog_writer, and the last-value channel rejects two
+        # writes in the same step).
         return {"linkedin_post": _parse_linkedin_post(response.content)}
 
 

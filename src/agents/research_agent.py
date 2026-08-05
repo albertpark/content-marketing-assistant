@@ -121,7 +121,7 @@ async def research_tools_node(state: "AgentState") -> dict:
     each ToolMessage to the buffer and each tool's structured artifact to
     research_findings. Increments research_tool_iterations by one completed
     round-trip — read back by research_agent_node/should_continue_research to
-    enforce MAX_RESEARCH_TOOL_ITERATIONS."""
+    enforce settings.research_tool_iterations_cap."""
     all_msgs = list(state["research_messages"])
     last_msg = all_msgs[-1]
 
