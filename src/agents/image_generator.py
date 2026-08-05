@@ -65,8 +65,10 @@ class ImageGeneratorAgent(BaseAgent):
         )
         image_prompt = _parse_image_prompt(response.content, image_brief or title)
 
-        # Note: does NOT set last_agent_used — see linkedin_writer.py's node for why
-        # (this node runs concurrently with blog_writer/linkedin_writer, not after).
+        # Note: does NOT set last_agent_used — this node runs concurrently with
+        # blog_writer (both fan out from content_strategist), which already writes
+        # it in the same step; last_agent_used's last-value channel rejects two
+        # writes in one step (InvalidUpdateError).
         asset = generate_image_with_fallback(image_prompt, alt_text=title)
         return {"image_assets": [asdict(asset)]}
 
