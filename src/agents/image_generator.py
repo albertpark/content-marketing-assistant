@@ -1,5 +1,9 @@
-"""Image Generator: produces a visual guided by the Content Strategist's image brief
-and the finished blog post; runs as an agent so image style stays consistent."""
+"""Image Generator: produces a visual guided by the Content Strategist's image brief;
+runs as an agent so image style stays consistent. Fans out from Content Strategist in
+parallel with Blog Writer (see langgraph_workflow.py), so it does not depend on the
+finished blog — only on content_brief.image_brief. When state already has a blog_post
+(e.g. an "regenerate only the image" refinement turn on existing content), its title
+is passed along too as supporting context, but it's never required."""
 
 from __future__ import annotations
 
@@ -20,7 +24,7 @@ if TYPE_CHECKING:
 _JSON_PATTERN = re.compile(r"\{.*\}", re.DOTALL)
 
 
-def _parse_image_prompt(raw: str, fallback_title: str) -> str:
+def _parse_image_prompt(raw: str, fallback: str) -> str:
     match = _JSON_PATTERN.search(raw or "")
     if match:
         try:
@@ -29,7 +33,7 @@ def _parse_image_prompt(raw: str, fallback_title: str) -> str:
                 return prompt
         except json.JSONDecodeError:
             pass
-    return f"A marketing header image for a blog post titled: {fallback_title}" if fallback_title else ""
+    return f"A marketing header image for: {fallback}" if fallback else ""
 
 
 class ImageGeneratorAgent(BaseAgent):
@@ -44,17 +48,25 @@ class ImageGeneratorAgent(BaseAgent):
 
     async def run(self, state: "AgentState") -> dict:
         brief = state.get("content_brief") or {}
-        blog_post = state.get("blog_post") or {}
-        title = blog_post.get("title", "")
-        context = f"Image brief: {brief.get('image_brief', '')}\nBlog title: {title}"
+        image_brief = brief.get("image_brief", "")
+        # blog_post is NOT guaranteed here — this node fans out from
+        # content_strategist in parallel with blog_writer, so on a fresh run the
+        # blog isn't written yet. It's only present on a "regenerate only the
+        # image" refinement turn (existing content, single-target Send() — see
+        # query_handler.py), where it's still useful supporting context.
+        title = (state.get("blog_post") or {}).get("title", "")
+
+        context = f"Image brief: {image_brief}"
+        if title:
+            context += f"\nBlog title (existing, for supporting context only): {title}"
 
         response = await self.invoke(
             [SystemMessage(content=self.system_prompt), HumanMessage(content=context)]
         )
-        image_prompt = _parse_image_prompt(response.content, title)
+        image_prompt = _parse_image_prompt(response.content, image_brief or title)
 
         # Note: does NOT set last_agent_used — see linkedin_writer.py's node for why
-        # (this node runs concurrently with it in the same superstep).
+        # (this node runs concurrently with blog_writer/linkedin_writer, not after).
         asset = generate_image_with_fallback(image_prompt, alt_text=title)
         return {"image_assets": [asdict(asset)]}
 

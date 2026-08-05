@@ -7,8 +7,9 @@ Presenter reference: [`component_notes.md`](component_notes.md)
 
 ContentAlchemy is a multi-agent content marketing assistant built on LangGraph. A single
 user request (e.g. "write me a blog and LinkedIn post about X") flows through one
-orchestrated graph: research → strategy → drafting (blog, then LinkedIn + image in
-parallel) → synthesis → quality/enhancement → dashboard/export.
+orchestrated graph: research → strategy → drafting (blog and image in parallel off the
+brief, then LinkedIn after the blog) → synthesis → quality/enhancement →
+dashboard/export.
 
 This maps to the six agents required by the problem statement (Query Handler, Deep
 Research, Content Strategist, SEO Blog Writer, LinkedIn Post Writer, Image Generation),
@@ -22,22 +23,33 @@ Interface
   → Orchestrator (Query Handler + Coordinator)
     → Research Agent  ⇄ Search tools (SERP + Perplexity)
     → Content Strategist                (angle/outline/keywords + image brief)
-    → Blog Writer                      (runs first — full SEO post)
-        ├→ LinkedIn Writer             (hook + link to blog)
+        ├→ Blog Writer                 (full SEO post)
+        │     └→ LinkedIn Writer       (hook + link to blog; waits on the blog)
         └→ Image Generator → Image tools (GPT Image + fallback)
-                (image brief from Content Strategist + finished blog title —
-                 both already in shared graph state, no separate edge needed)
-    → Synthesizer                      (assembles final cross-linked package)
+                (works from the image brief alone — does not wait on Blog Writer)
+    → Synthesizer                      (joins LinkedIn Writer + Image Generator;
+                                         assembles final cross-linked package)
     → Quality & Enhancement Pipeline   (structural · SEO · brand · facts)
         ├→ Content Dashboard           (review, edit, approve)
         └→ Export Tools                (per-platform formats, images)
 ```
 
-Key sequencing decision: **Blog Writer runs before LinkedIn/Image**, because the
-LinkedIn post links back to the blog and the image is generated from the finished blog
-title (plus the Content Strategist's image brief), not from the raw brief alone.
-LinkedIn and Image generation then run as parallel branches off the Blog Writer output
-and rejoin at the Synthesizer.
+Key sequencing decisions:
+- **Blog Writer runs before LinkedIn Writer**, because the LinkedIn post links back to
+  the finished blog and needs its actual content, not just the raw brief.
+- **Image Generator runs in parallel with Blog Writer, off the Content Strategist's
+  brief**, not after the blog. The strategist's `image_brief` field (subject/mood) is
+  what lets the image agent start immediately instead of waiting on the finished post —
+  trading "image guaranteed to match the exact published wording" for lower end-to-end
+  latency. Synthesizer joins both branches before assembling the final package, so this
+  reordering is safe: Blog Writer is still guaranteed complete by the time Synthesizer
+  runs, via the LinkedIn Writer branch. This join is **not** automatic, though — the
+  two branches are different lengths now (Image Generator is 1 hop from Content
+  Strategist; LinkedIn Writer is 2, via Blog Writer), and LangGraph's default fan-in
+  fires as soon as *any* incoming edge delivers a value rather than waiting for all of
+  them, once branches stop being the same length. Synthesizer is registered with
+  `defer=True` (see langgraph_workflow.py) specifically to hold its execution until
+  every pending branch — including the longer one — has actually finished.
 
 The dashed feedback edge from the Quality & Enhancement Pipeline back up to the
 Blog Writer / Content Strategist area is the **revision loop**: failed quality gates
@@ -79,35 +91,39 @@ failing the whole run.
   key points, target keywords, and an image brief) that downstream writers — and the
   Image Generator — consume.
 - **In:** research findings.
-- **Out:** brief → Blog Writer directly; the brief's `image_brief` field also reaches
-  the Image Generator via shared graph state (no separate edge — state persists across
-  the whole run, so any downstream node can read it once written).
+- **Out:** brief → fans out to Blog Writer and Image Generator in parallel (fixed
+  edges from Content Strategist to both — see langgraph_workflow.py).
 
 ### Blog Writer
-- **Purpose:** produces the full long-form, SEO-optimized post. Runs first because
-  everything downstream (LinkedIn hook, image prompt) derives from it.
+- **Purpose:** produces the full long-form, SEO-optimized post.
 - **In:** content brief.
-- **Out:** finished blog post → fans out to LinkedIn Writer and Image Generator.
+- **Out:** finished blog post → LinkedIn Writer.
+- **Notes:** runs in parallel with Image Generator (both fan out from Content
+  Strategist), but still before LinkedIn Writer — the LinkedIn hook needs the actual
+  finished post, not just the brief.
 
 ### LinkedIn Writer
 - **Purpose:** short-form, platform-optimized post with a hook and a link back to the
-  blog. Runs in parallel with Image Generator.
+  blog.
 - **In:** finished blog post.
 - **Out:** LinkedIn post draft → Synthesizer.
 
 ### Image Generator
 - **Purpose:** produces a visual guided by the Content Strategist's `image_brief`
-  (subject matter/mood) plus the finished blog's title, using its own system prompt
-  so every generated image follows a consistent house style (composition, mood, no
-  embedded text/logos) rather than a title-only guess.
-- **In:** `content_brief.image_brief` (from Content Strategist) + finished blog post
-  title — both already present in shared graph state by the time this node runs.
+  (subject matter/mood), using its own system prompt so every generated image follows
+  a consistent house style (composition, mood, no embedded text/logos) rather than a
+  title-only guess.
+- **In:** `content_brief.image_brief` (from Content Strategist). Does **not** wait on
+  the finished blog — it runs in parallel with Blog Writer, off the same brief. If a
+  finished blog title happens to already be in state (e.g. a "regenerate only the
+  image" refinement turn on existing content), it's passed along as optional
+  supporting context, never required.
 - **Out:** image asset(s) → Synthesizer.
-- **Flow:** one LLM call (its own system prompt) turns the image brief + blog title
-  into a single image-generation prompt; that prompt then makes one call into **Image
-  tools**' provider-fallback chain. This is *not* a bidirectional tool loop like
-  Research Agent's — there's no LLM-driven back-and-forth, just prompt synthesis
-  followed by a single generation call (with its own internal retry/fallback).
+- **Flow:** one LLM call (its own system prompt) turns the image brief into a single
+  image-generation prompt; that prompt then makes one call into **Image tools**'
+  provider-fallback chain. This is *not* a bidirectional tool loop like Research
+  Agent's — there's no LLM-driven back-and-forth, just prompt synthesis followed by a
+  single generation call (with its own internal retry/fallback).
 
 ### Image tools (GPT Image + fallback)
 - **Purpose:** pluggable image backends with a fallback chain (primary generator →

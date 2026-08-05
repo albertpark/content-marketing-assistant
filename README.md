@@ -99,14 +99,16 @@ uv run pytest tests/ --cov=src --cov-report=term-missing
 
 ContentAlchemy routes a single user request through one orchestrated LangGraph graph
 rather than exposing separate tools per content type. The core insight driving the
-architecture: **the blog post is written first**, and the LinkedIn post and image are
-both derived from the *finished* blog rather than the raw brief — so the hook links
-back correctly and the image actually matches what got published.
+architecture: **the blog post and image generate in parallel**, both off the Content
+Strategist's brief, while the **LinkedIn post still waits on the finished blog** — its
+hook links back to the actual post, so it can't start from the raw brief the way the
+image can.
 
 The system:
 
 - **Researches** a topic across multiple sources with citations
-- **Drafts** a full SEO blog post, then a LinkedIn post and an image in parallel
+- **Drafts** a full SEO blog post and header image in parallel from the same brief,
+  then a LinkedIn post once the blog is finished
 - **Synthesizes** the three outputs into one cross-linked package
 - **Validates** structure, SEO, brand voice, and facts — looping back for revision on
   failure
@@ -124,7 +126,8 @@ walkthrough of each box in the diagram lives in
 
 - ✅ **Multi-Agent Architecture** — six specialized agents, intelligently orchestrated
 - ✅ **Research-First Workflow** — multi-source web research with source citations
-- ✅ **Sequenced Content Generation** — blog first, then LinkedIn + image derived from it
+- ✅ **Parallel Content Generation** — blog and image generate together off the brief;
+  LinkedIn waits on the finished blog since it links back to it
 - ✅ **Quality & Enhancement Pipeline** — structural, SEO, brand, and fact-check gates
   with an automatic revision loop
 - ✅ **Multi-Provider Integrations** — OpenAI, Anthropic, Gemini for text; SERP API +
@@ -168,17 +171,21 @@ walkthrough of each box in the diagram lives in
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ 3. Strategy → Draft                                             │
+│ 3. Strategy                                                     │
 │    • Content Strategist formats research into a brief           │
-│    • Blog Writer produces the full SEO post FIRST               │
+│      (angle, outline, key points, target keywords, image brief) │
 └────────────────────────────┬────────────────────────────────────┘
                              │
                  ┌───────────┴───────────┐
                  ▼                       ▼
 ┌───────────────────────────┐ ┌───────────────────────────────────┐
-│ 4a. LinkedIn Writer       │ │ 4b. Img Generator <=> Image tools │
-│    hook + link to blog    │ │    visual derived from finished   │
-│                           │ │    blog, capped-retry tool loop   │
+│ 4a. Blog Writer           │ │ 4b. Img Generator → Image tools   │
+│    full SEO post          │ │    visual from the brief's        │
+│      │                    │ │    image_brief — does NOT wait    │
+│      ▼                    │ │    on the blog. Single-shot call, │
+│ 4c. LinkedIn Writer       │ │    provider fallback (not a tool  │
+│    hook + link to blog    │ │    loop)                          │
+│    (waits on 4a)          │ │                                   │
 └────────────────┬──────────┘ └──────────┬────────────────────────┘
                  └───────────┬───────────┘
                              ▼
@@ -380,22 +387,22 @@ punchier") route correctly without re-explaining the topic.
 ### Content Strategist
 
 **Purpose:** turns raw research into a structured brief — angle, outline, key points,
-target keywords, and an image brief — consumed by the Blog Writer and, later, the
-Image Generator.
+target keywords, and an image brief — that fans out to the Blog Writer and Image
+Generator in parallel.
 
 ### Blog Writer
 
-**Purpose:** full-length, SEO-optimized post. Runs **first**, deliberately, so
-LinkedIn and Image generation both derive from the finished piece rather than the raw
-brief.
+**Purpose:** full-length, SEO-optimized post. Runs in parallel with Image Generator
+(both fed by the Content Strategist's brief), but still before LinkedIn Writer, since
+the LinkedIn hook needs the finished piece, not the raw brief.
 
 **Planned optimizations:** keyword density (1–2% target keyword), meta description
 (150–160 chars), H1/H2/H3 structure, Flesch-Kincaid readability scoring.
 
 ### LinkedIn Writer
 
-**Purpose:** short-form post with a hook and a link back to the blog. Runs in parallel
-with Image Generator, both fed the finished blog.
+**Purpose:** short-form post with a hook and a link back to the blog. Runs after Blog
+Writer finishes (a real dependency — it links to the finished post).
 
 **Planned optimizations:** 1,300–1,600 characters, 8–12 relevant hashtags, engagement
 hook + CTA, line-break formatting for readability.
@@ -403,10 +410,11 @@ hook + CTA, line-break formatting for readability.
 ### Image Generator
 
 **Purpose:** its own agent with a dedicated system prompt, so generated images follow
-a consistent house style. Combines the Content Strategist's image brief (subject
-matter/mood) with the finished blog's title to write an image-generation prompt, then
-calls the image API through a fallback chain (primary provider → secondary →
-placeholder) so a provider outage never blocks the pipeline.
+a consistent house style. Runs in parallel with Blog Writer, straight off the Content
+Strategist's `image_brief` (subject matter/mood) — it does not wait on the finished
+blog. Writes an image-generation prompt from that brief, then calls the image API
+through a fallback chain (primary provider → secondary → placeholder) so a provider
+outage never blocks the pipeline.
 
 ---
 

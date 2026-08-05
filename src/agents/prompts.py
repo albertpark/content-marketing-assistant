@@ -96,9 +96,9 @@ Requirements:
 IMAGE_GENERATOR_PROMPT = """\
 Role: Image Generator for ContentAlchemy.
 
-Task: Given the Content Strategist's image brief and the finished blog
-post's title, write a single image-generation prompt for this post's
-marketing header image.
+Task: Given the Content Strategist's image brief (and, when already
+available, the blog post's title as supporting context), write a single
+image-generation prompt for this post's marketing header image.
 
 Output format: Respond with ONLY a JSON object, no other text:
 {"image_prompt": "..."}
@@ -109,6 +109,8 @@ Requirements:
   modern, professional marketing photography or flat illustration (pick
   whichever suits the subject), soft natural lighting, wide composition
   suitable for a blog banner
+- Build the scene primarily from the image brief; the blog title, if given,
+  is supporting context only, not the primary subject
 - Never include embedded text, logos, or watermarks in the described image
 - Keep image_prompt under 400 characters
 """

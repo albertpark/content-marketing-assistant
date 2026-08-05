@@ -37,25 +37,29 @@ agent logic — this is also the fallback path if one provider is down.
 
 **Content Strategist**
 Turns raw research into a structured brief — angle, outline, keywords, and an image
-brief.
+brief. Fans out to Blog Writer *and* Image Generator in parallel.
 > "This is the hand-off point between 'here's what we found' and 'here's what to
-> write' — and it also tells the Image Generator what the header image should
-> actually depict, not just its title."
+> write' — and the image brief means the Image Generator can start right away, in
+> parallel with the blog, instead of waiting on it."
 
 ---
 
 **Blog Writer**
-Full SEO-optimized long-form post. **Runs first**, deliberately.
-> "Everything else derives from the blog — the LinkedIn hook links back to it, and the
-> image is generated from the finished post, not a guess at what the post might say."
-Q: Why not generate everything in parallel? → Because LinkedIn and the image need the
-*finished* blog as input, not the raw brief — sequencing this way avoids drift between
-the three formats.
+Full SEO-optimized long-form post. Runs in parallel with Image Generator, both off
+the Content Strategist's brief — but still before LinkedIn Writer.
+> "The LinkedIn hook links back to the finished blog, so LinkedIn has to wait. The
+> image doesn't need the blog's actual wording, just the brief's image concept — so
+> it doesn't have to wait, and runs alongside the blog instead."
+Q: Why not run everything in parallel? → LinkedIn Writer still needs the *finished*
+blog specifically, since it links back to it — that dependency is real. Image
+Generator's dependency on the blog was designed away once the Content Strategist
+started producing a dedicated image brief.
 
 ---
 
 **LinkedIn Writer**
-Short-form post, hook + link back to the blog. Runs parallel to Image Generator.
+Short-form post, hook + link back to the blog. Runs after Blog Writer (not parallel to
+it — depends on the finished post).
 > "Same underlying content, re-cut for a different platform's constraints — length,
 > hashtags, tone."
 
@@ -63,14 +67,21 @@ Short-form post, hook + link back to the blog. Runs parallel to Image Generator.
 
 **Image Generator** → **Image tools**
 Its own agent with a dedicated system prompt: turns the Content Strategist's image
-brief + the finished blog title into one image-generation prompt, then calls Image
-tools' fallback chain (GPT Image → fallback → placeholder).
+brief into one image-generation prompt, then calls Image tools' fallback chain
+(GPT Image → fallback → placeholder). Runs in parallel with Blog Writer, straight off
+the Content Strategist — it doesn't wait for the blog to finish.
 > "This has its own system prompt so every image comes out in the same house style —
-> composition, mood, no stray embedded text — instead of drifting per topic. If the
+> composition, mood, no stray embedded text — instead of drifting per topic. It also
+> doesn't block on the blog anymore, since the strategist's image brief gives it
+> enough to start immediately — that's what shortens the overall pipeline. If the
 > primary image provider fails or times out, we don't just show a broken image —
 > there's a fallback provider before we give up."
 Q: Is this a tool loop like Research Agent? → No — one LLM call to write the image
 prompt, one call to generate it. No back-and-forth tool calling.
+Q: Doesn't skipping the finished blog risk the image not matching the post? → Some
+risk, yes — traded off deliberately for latency. The image brief comes from the same
+research/strategy pass as the blog, so it's aligned in substance even without seeing
+final wording.
 
 ---
 
@@ -135,8 +146,8 @@ new provider only needs to happen once here.
 
 1. Interface → Orchestrator (show intent routing on a fresh request)
 2. Research Agent ⇄ Search tools (show a research result with citations)
-3. Content Strategist → Blog Writer (show the brief → finished post)
-4. LinkedIn Writer + Image Generator running off the same blog (parallelism)
+3. Content Strategist → Blog Writer + Image Generator running in parallel off the
+   same brief (parallelism) → LinkedIn Writer once the blog finishes
 5. Synthesizer → Quality & Enhancement Pipeline (trigger one failure → show the
    revision loop firing)
 6. Content Dashboard → Export Tools (show an edit, then an export)
