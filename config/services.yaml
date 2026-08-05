@@ -19,3 +19,4 @@ resilience:
 performance:
   cache_ttl_minutes: 30
   rate_limit_per_minute: 60
+  rate_limit_burst_capacity: 10   # override via RATE_LIMIT_BURST_CAPACITY env var

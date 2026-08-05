@@ -8,6 +8,7 @@ _ENV_VARS_TO_CLEAR = (
     "PERPLEXITY_MODEL",
     "REVISION_LOOP_CAP",
     "RESEARCH_TOOL_ITERATIONS_CAP",
+    "RATE_LIMIT_BURST_CAPACITY",
     "MAX_RETRIES",
     "BACKOFF_SECONDS",
     "SESSION_STORE_URL",
@@ -68,6 +69,17 @@ def test_research_tool_iterations_cap_env_override(monkeypatch):
 def test_research_tool_iterations_cap_default_from_yaml():
     settings = load_settings("development")
     assert settings.research_tool_iterations_cap == 3
+
+
+def test_rate_limit_burst_capacity_env_override(monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT_BURST_CAPACITY", "25")
+    settings = load_settings("development")
+    assert settings.rate_limit_burst_capacity == 25
+
+
+def test_rate_limit_burst_capacity_default_from_yaml():
+    settings = load_settings("development")
+    assert settings.rate_limit_burst_capacity == 10
 
 
 def test_production_session_store_defaults_to_postgres():

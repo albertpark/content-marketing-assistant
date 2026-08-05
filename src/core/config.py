@@ -52,6 +52,7 @@ class Settings:
     research_tool_iterations_cap: int
     cache_ttl_minutes: int
     rate_limit_per_minute: int
+    rate_limit_burst_capacity: int
 
     log_level: str
 
@@ -126,6 +127,9 @@ def load_settings(environment: str | None = None) -> Settings:
         ),
         cache_ttl_minutes=int(performance.get("cache_ttl_minutes", 30)),
         rate_limit_per_minute=int(performance.get("rate_limit_per_minute", 60)),
+        rate_limit_burst_capacity=int(
+            os.getenv("RATE_LIMIT_BURST_CAPACITY") or performance.get("rate_limit_burst_capacity", 10)
+        ),
         log_level=logging_cfg.get("level", "INFO"),
     )
 

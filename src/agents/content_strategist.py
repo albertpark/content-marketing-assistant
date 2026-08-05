@@ -25,6 +25,17 @@ _EMPTY_BRIEF = {
     "image_brief": "",
 }
 
+# See blog_writer.py's _STATIC_FALLBACK for the JSON-matches-_parse_* rationale.
+_STATIC_FALLBACK = json.dumps(
+    {
+        "angle": "General overview (generated under high demand — retry for a tailored angle)",
+        "outline": ["Introduction", "Key considerations", "Conclusion"],
+        "key_points": [],
+        "target_keywords": [],
+        "image_brief": "",
+    }
+)
+
 
 def _parse_brief(raw: str) -> dict:
     match = _JSON_PATTERN.search(raw or "")
@@ -51,6 +62,7 @@ class ContentStrategistAgent(BaseAgent):
             temperature=0.4,
             system_prompt=CONTENT_STRATEGIST_PROMPT,
             debug=debug,
+            static_fallback=_STATIC_FALLBACK,
         )
 
     async def run(self, state: "AgentState") -> dict:

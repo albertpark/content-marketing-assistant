@@ -44,6 +44,11 @@ class ImageGeneratorAgent(BaseAgent):
             temperature=0.6,
             system_prompt=IMAGE_GENERATOR_PROMPT,
             debug=debug,
+            # Empty, not templated text: _parse_image_prompt("", image_brief or
+            # title) already synthesizes "A marketing header image for: ..."
+            # from empty/unparseable content, so this reuses that existing
+            # logic instead of duplicating it here.
+            static_fallback="",
         )
 
     async def run(self, state: "AgentState") -> dict:

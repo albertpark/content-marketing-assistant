@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, TypeVar
 
@@ -9,7 +10,7 @@ from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel
 
-from src.integrations import llm_client
+from src.integrations import llm_client, performance
 from src.integrations.resilience import AllRetriesExhaustedError, ProviderError, with_retry
 
 if TYPE_CHECKING:
@@ -18,6 +19,33 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _SchemaT = TypeVar("_SchemaT", bound=BaseModel)
+
+# Shared across every BaseAgent instance for a given agent_name — a fresh
+# BaseAgent is constructed on every graph-node call, so a degraded-response
+# cache (or the admission limiter it backstops, see performance.get_admission_limiter)
+# only works if it lives at module scope rather than on self. Not TTL'd: mirrors
+# the notebook's response_cache exactly (last-successful-wins, no expiry) since a
+# stale cached draft is still strictly better than the static tier below it.
+_RESPONSE_CACHE: dict[str, str] = {}
+
+
+def _cache_key(agent_name: str, conversation: list[BaseMessage]) -> str:
+    # Includes each message's type, not just content, so e.g. a HumanMessage and
+    # a SystemMessage with identical text don't collide on the same digest.
+    text = "\n".join(f"{type(m).__name__}:{getattr(m, 'content', '')}" for m in conversation)
+    digest = hashlib.sha256(text.encode()).hexdigest()
+    return f"{agent_name}:{digest}"
+
+
+class _FallbackAIMessage(AIMessage):
+    """A real AIMessage subclass (not a duck-typed stand-in) for degraded
+    (cached/static) responses — research_agent_node appends whatever this
+    returns into state["research_messages"], which the sqlite/postgres
+    checkpointers serialize on every step (see test_graph_e2e.py's own
+    _FakeAIMessage for the same requirement)."""
+
+    def __init__(self, content: str):
+        super().__init__(content=content, tool_calls=[])
 
 
 @with_retry(retry_on=(ProviderError,))
@@ -72,6 +100,20 @@ class BaseAgent:
     in the chain is tried before giving up — this is the milestone-2 "fallback
     mechanisms and error handling for API failures" requirement, centralized
     here rather than duplicated per agent.
+
+    Text-producing calls (invoke()/call_once(), via _ainvoke_llm — NOT
+    invoke_structured(), see below) sit behind a further, non-blocking
+    admission gate (src.integrations.performance.TokenBucketLimiter) and a
+    3-tier degradation ladder: (1) admission-gated provider-fallback chain
+    above, (2) the last cached response to an identical conversation, (3) the
+    subclass's static_fallback string. This collapses the notebook's 4-tier
+    "primary model -> smaller model -> cache -> static" design into 3 tiers,
+    since provider-fallback here already plays the "swap to a different model"
+    role the notebook's Tier 2 does — there's no separate cheaper model to add.
+    invoke_structured() deliberately stays on the plain provider chain with no
+    degradation: it's only used for the orchestrator's routing decision, and
+    there's no generically-safe fallback schema instance for an arbitrary
+    Pydantic model.
     """
 
     def __init__(
@@ -83,6 +125,8 @@ class BaseAgent:
         tools: list[BaseTool] | None = None,
         max_tool_iterations: int = 3,
         debug: bool = False,
+        static_fallback: str | None = None,
+        admission_limiter: performance.TokenBucketLimiter | None = None,
     ):
         self.agent_name = agent_name
         self.system_prompt = system_prompt
@@ -91,8 +135,14 @@ class BaseAgent:
         self._tools_list = tools
         self.max_tool_iterations = max_tool_iterations
         self.debug = debug
+        self.static_fallback = static_fallback
         self._provider_chain = llm_client.fallback_chain(provider)
         self._llm_cache: dict[str, Any] = {}
+        # Resolved here (not as a `= performance.get_admission_limiter()` default
+        # expression) so each call sees whatever the current singleton is —
+        # a default expression would capture one instance at class-definition
+        # time and never observe a later get_admission_limiter.cache_clear().
+        self._admission_limiter = admission_limiter or performance.get_admission_limiter()
 
     def _llm_for(self, provider: str) -> Any:
         if provider not in self._llm_cache:
@@ -134,7 +184,40 @@ class BaseAgent:
         )
 
     async def _ainvoke_llm(self, conversation: list[BaseMessage]) -> AIMessage:
-        return await self._with_fallback_chain(lambda llm: _invoke_one(llm, conversation))
+        """Tier 1: full provider-fallback chain, attempted only if the shared
+        admission limiter grants a token (reject-not-queue: see
+        TokenBucketLimiter — a rejection degrades immediately rather than
+        adding latency). Falls through to Tier 2 (cached response to an
+        identical conversation) and Tier 3 (self.static_fallback) on either an
+        admission rejection or AllRetriesExhaustedError, re-raising only if
+        neither tier below has anything to offer. See the class docstring for
+        why this ladder has 3 tiers, not the notebook's 4."""
+        cache_key = _cache_key(self.agent_name, conversation)
+
+        last_exc: AllRetriesExhaustedError | None = None
+        if self._admission_limiter.try_acquire():
+            try:
+                response = await self._with_fallback_chain(lambda llm: _invoke_one(llm, conversation))
+                _RESPONSE_CACHE[cache_key] = response.content
+                return response
+            except AllRetriesExhaustedError as exc:
+                last_exc = exc
+                logger.warning("[%s] all providers exhausted; degrading", self.agent_name)
+        else:
+            logger.warning("[%s] admission rejected by rate limiter; degrading without a call", self.agent_name)
+
+        cached_content = _RESPONSE_CACHE.get(cache_key)
+        if cached_content is not None:
+            logger.warning("[%s] serving cached response (degraded)", self.agent_name)
+            return _FallbackAIMessage(cached_content)
+
+        if self.static_fallback is not None:
+            logger.warning("[%s] serving static fallback response (degraded)", self.agent_name)
+            return _FallbackAIMessage(self.static_fallback)
+
+        raise last_exc or AllRetriesExhaustedError(
+            f"{self.agent_name}: rate-limited with no cached or static fallback available"
+        )
 
     async def _with_fallback_chain(self, call_fn: Callable[[Any], Awaitable[Any]]) -> Any:
         last_exc: Exception | None = None
