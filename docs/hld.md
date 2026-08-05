@@ -7,8 +7,9 @@ Presenter reference: [`component_notes.md`](component_notes.md)
 
 ContentAlchemy is a multi-agent content marketing assistant built on LangGraph. A single
 user request (e.g. "write me a blog and LinkedIn post about X") flows through one
-orchestrated graph: research → strategy → drafting (blog, then LinkedIn + image in
-parallel) → synthesis → quality/enhancement → dashboard/export.
+orchestrated graph: research → strategy → drafting (blog and image in parallel off the
+brief, then LinkedIn after the blog) → synthesis → quality/enhancement →
+dashboard/export.
 
 This maps to the six agents required by the problem statement (Query Handler, Deep
 Research, Content Strategist, SEO Blog Writer, LinkedIn Post Writer, Image Generation),
@@ -21,21 +22,34 @@ but are required for the system to be production-grade.
 Interface
   → Orchestrator (Query Handler + Coordinator)
     → Research Agent  ⇄ Search tools (SERP + Perplexity)
-    → Content Strategist
-    → Blog Writer                      (runs first — full SEO post)
-        ├→ LinkedIn Writer             (hook + link to blog)
-        └→ Image Generator ⇄ Image tools (GPT Image + fallback)
-                (from finished blog)
-    → Synthesizer                      (assembles final cross-linked package)
+    → Content Strategist                (angle/outline/keywords + image brief)
+        ├→ Blog Writer                 (full SEO post)
+        │     └→ LinkedIn Writer       (hook + link to blog; waits on the blog)
+        └→ Image Generator → Image tools (GPT Image + fallback)
+                (works from the image brief alone — does not wait on Blog Writer)
+    → Synthesizer                      (joins LinkedIn Writer + Image Generator;
+                                         assembles final cross-linked package)
     → Quality & Enhancement Pipeline   (structural · SEO · brand · facts)
         ├→ Content Dashboard           (review, edit, approve)
         └→ Export Tools                (per-platform formats, images)
 ```
 
-Key sequencing decision: **Blog Writer runs before LinkedIn/Image**, because the
-LinkedIn post links back to the blog and the image is generated from the finished blog
-content, not from the raw brief. LinkedIn and Image generation then run as parallel
-branches off the Blog Writer output and rejoin at the Synthesizer.
+Key sequencing decisions:
+- **Blog Writer runs before LinkedIn Writer**, because the LinkedIn post links back to
+  the finished blog and needs its actual content, not just the raw brief.
+- **Image Generator runs in parallel with Blog Writer, off the Content Strategist's
+  brief**, not after the blog. The strategist's `image_brief` field (subject/mood) is
+  what lets the image agent start immediately instead of waiting on the finished post —
+  trading "image guaranteed to match the exact published wording" for lower end-to-end
+  latency. Synthesizer joins both branches before assembling the final package, so this
+  reordering is safe: Blog Writer is still guaranteed complete by the time Synthesizer
+  runs, via the LinkedIn Writer branch. This join is **not** automatic, though — the
+  two branches are different lengths now (Image Generator is 1 hop from Content
+  Strategist; LinkedIn Writer is 2, via Blog Writer), and LangGraph's default fan-in
+  fires as soon as *any* incoming edge delivers a value rather than waiting for all of
+  them, once branches stop being the same length. Synthesizer is registered with
+  `defer=True` (see langgraph_workflow.py) specifically to hold its execution until
+  every pending branch — including the longer one — has actually finished.
 
 The dashed feedback edge from the Quality & Enhancement Pipeline back up to the
 Blog Writer / Content Strategist area is the **revision loop**: failed quality gates
@@ -74,28 +88,42 @@ failing the whole run.
 
 ### Content Strategist
 - **Purpose:** formats raw research into a structured content brief (angle, outline,
-  key points, target keywords) that downstream writers consume.
+  key points, target keywords, and an image brief) that downstream writers — and the
+  Image Generator — consume.
 - **In:** research findings.
-- **Out:** brief → Blog Writer.
+- **Out:** brief → fans out to Blog Writer and Image Generator in parallel (fixed
+  edges from Content Strategist to both — see langgraph_workflow.py).
 
 ### Blog Writer
-- **Purpose:** produces the full long-form, SEO-optimized post. Runs first because
-  everything downstream (LinkedIn hook, image prompt) derives from it.
+- **Purpose:** produces the full long-form, SEO-optimized post.
 - **In:** content brief.
-- **Out:** finished blog post → fans out to LinkedIn Writer and Image Generator.
+- **Out:** finished blog post → LinkedIn Writer.
+- **Notes:** runs in parallel with Image Generator (both fan out from Content
+  Strategist), but still before LinkedIn Writer — the LinkedIn hook needs the actual
+  finished post, not just the brief.
 
 ### LinkedIn Writer
 - **Purpose:** short-form, platform-optimized post with a hook and a link back to the
-  blog. Runs in parallel with Image Generator.
+  blog.
 - **In:** finished blog post.
 - **Out:** LinkedIn post draft → Synthesizer.
 
 ### Image Generator
-- **Purpose:** produces a visual derived from the finished blog (not the raw brief),
-  so imagery matches the actual published content.
-- **In:** finished blog post.
+- **Purpose:** produces a visual guided by the Content Strategist's `image_brief`
+  (subject matter/mood), using its own system prompt so every generated image follows
+  a consistent house style (composition, mood, no embedded text/logos) rather than a
+  title-only guess.
+- **In:** `content_brief.image_brief` (from Content Strategist). Does **not** wait on
+  the finished blog — it runs in parallel with Blog Writer, off the same brief. If a
+  finished blog title happens to already be in state (e.g. a "regenerate only the
+  image" refinement turn on existing content), it's passed along as optional
+  supporting context, never required.
 - **Out:** image asset(s) → Synthesizer.
-- **Tool loop:** bidirectional, capped-retry loop against **Image tools**.
+- **Flow:** one LLM call (its own system prompt) turns the image brief into a single
+  image-generation prompt; that prompt then makes one call into **Image tools**'
+  provider-fallback chain. This is *not* a bidirectional tool loop like Research
+  Agent's — there's no LLM-driven back-and-forth, just prompt synthesis followed by a
+  single generation call (with its own internal retry/fallback).
 
 ### Image tools (GPT Image + fallback)
 - **Purpose:** pluggable image backends with a fallback chain (primary generator →
@@ -167,7 +195,7 @@ failing the whole run.
 |---|---|
 | Fixed edge (solid arrow) | Deterministic hand-off, always taken. |
 | Conditional edge (dashed, revision loop) | Taken only when the Quality & Enhancement Pipeline fails a gate; routes back upstream for revision, capped retries. |
-| Tool loop (bidirectional, capped retries) | Agent ⇄ tool call-and-response (Search tools, Image tools), retried up to a cap before falling back or failing gracefully. |
+| Tool loop (bidirectional, capped retries) | Research Agent ⇄ Search tools: the LLM decides when/how to call the tool, looping until it stops or a cap is hit. (Image Generator's call into Image tools is a single-shot, provider-fallback call — not this pattern; see the Image Generator component note.) |
 
 ## 5. Rubric cross-reference
 

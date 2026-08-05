@@ -21,9 +21,10 @@ from src.workflow.synthesizer import synthesizer_node
 
 def build_graph(checkpointer: BaseCheckpointSaver | None = None) -> CompiledStateGraph:
     """Assembles and compiles the full ContentAlchemy pipeline graph, matching
-    docs/hld.md's data flow: Orchestrator -> Research -> Strategist -> Blog Writer
-    -> {LinkedIn Writer, Image Generator} -> Synthesizer -> Quality Pipeline, with
-    a conditional revision loop back to Blog Writer.
+    docs/hld.md's data flow: Orchestrator -> Research -> Strategist -> {Blog Writer,
+    Image Generator} (parallel) -> Blog Writer -> LinkedIn Writer -> Synthesizer
+    (joined with Image Generator) -> Quality Pipeline, with a conditional revision
+    loop back to Blog Writer.
 
     checkpointer: pass an explicit one for backends that require a
     freshly-opened, per-call checkpointer (sqlite/postgres — see
@@ -39,7 +40,16 @@ def build_graph(checkpointer: BaseCheckpointSaver | None = None) -> CompiledStat
     workflow.add_node("blog_writer", blog_writer_node)
     workflow.add_node("linkedin_writer", linkedin_writer_node)
     workflow.add_node("image_generator", image_generator_node)
-    workflow.add_node("synthesizer", synthesizer_node)
+    # defer=True: synthesizer's two incoming branches (linkedin_writer, via
+    # blog_writer — 2 hops from content_strategist; image_generator — 1 hop) are no
+    # longer the same length now that image_generator fans out directly from
+    # content_strategist. LangGraph's default fan-in fires as soon as any incoming
+    # edge delivers a value, not once all of them have — that only happens to look
+    # like a wait-for-all join when every branch is the same length. defer=True is
+    # LangGraph's built-in fix: it holds this node's execution until nothing else
+    # is left pending in the run, which is what actually guarantees both branches
+    # (and, transitively, blog_writer) have completed first.
+    workflow.add_node("synthesizer", synthesizer_node, defer=True)
     workflow.add_node("quality_pipeline", quality_pipeline_node)
 
     workflow.add_edge(START, "orchestrator")
@@ -57,17 +67,23 @@ def build_graph(checkpointer: BaseCheckpointSaver | None = None) -> CompiledStat
     )
     workflow.add_edge("research_tools_node", "research_agent")
 
+    # Fan-out: both edges originate from content_strategist, so blog_writer and
+    # image_generator run concurrently — image_generator no longer waits on the
+    # finished blog, it works from content_brief.image_brief instead (see
+    # src/agents/image_generator.py).
     workflow.add_edge("content_strategist", "blog_writer")
+    workflow.add_edge("content_strategist", "image_generator")
 
-    # Fan-out: both edges originate from blog_writer, so LangGraph's Pregel
-    # scheduler runs linkedin_writer and image_generator concurrently in the same
-    # superstep.
     workflow.add_edge("blog_writer", "linkedin_writer")
-    workflow.add_edge("blog_writer", "image_generator")
 
-    # Fan-in: synthesizer has incoming edges from both and only runs once both have
-    # completed. Safe because they write disjoint state keys (linkedin_post vs.
-    # image_assets) — see AgentState's docstring note on reducers.
+    # Fan-in: synthesizer has incoming edges from both linkedin_writer and
+    # image_generator. Since those two branches are different lengths (image_generator
+    # is 1 hop from content_strategist; linkedin_writer is 2, via blog_writer),
+    # synthesizer needs defer=True (set on add_node above) to actually wait for both —
+    # a plain fixed-edge join only reliably waits for all predecessors when every
+    # branch is the same length; otherwise it fires as soon as the first one arrives.
+    # Safe once deferred, because the two branches write disjoint state keys
+    # (linkedin_post vs. image_assets) — see AgentState's docstring note on reducers.
     workflow.add_edge("linkedin_writer", "synthesizer")
     workflow.add_edge("image_generator", "synthesizer")
 

@@ -63,8 +63,10 @@ STRATEGIST_RESPONSE = json.dumps(
         "outline": ["intro", "body", "conclusion"],
         "key_points": ["point one", "point two"],
         "target_keywords": ["test topic"],
+        "image_brief": "A person learning at a desk with a laptop.",
     }
 )
+IMAGE_RESPONSE = json.dumps({"image_prompt": "A person learning at a desk, header banner style."})
 BLOG_RESPONSE_GOOD = json.dumps(
     {
         "title": "Test Topic: A Complete Guide",
@@ -109,6 +111,7 @@ def _patch_agent_llms(monkeypatch, blog_response: str):
         "content_strategist": STRATEGIST_RESPONSE,
         "blog_writer": blog_response,
         "linkedin_writer": LINKEDIN_RESPONSE,
+        "image_generator": IMAGE_RESPONSE,
     }
     monkeypatch.setattr(
         BaseAgent, "_llm_for", lambda self, provider: _FakeChatModel(responses[self.agent_name])

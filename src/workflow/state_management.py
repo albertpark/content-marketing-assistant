@@ -61,7 +61,7 @@ class AgentState(TypedDict):
     research_provider_used: str | None  # "serpapi" | "perplexity" | None
 
     # strategy
-    content_brief: dict | None  # {angle, outline, key_points, target_keywords}
+    content_brief: dict | None  # {angle, outline, key_points, target_keywords, image_brief}
 
     # drafts
     blog_post: dict | None  # {title, body_markdown, meta_description, headers, word_count}

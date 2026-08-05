@@ -17,19 +17,29 @@ if TYPE_CHECKING:
 _JSON_PATTERN = re.compile(r"\{.*\}", re.DOTALL)
 
 
+_EMPTY_BRIEF = {
+    "angle": "",
+    "outline": [],
+    "key_points": [],
+    "target_keywords": [],
+    "image_brief": "",
+}
+
+
 def _parse_brief(raw: str) -> dict:
     match = _JSON_PATTERN.search(raw or "")
     if not match:
-        return {"angle": raw or "", "outline": [], "key_points": [], "target_keywords": []}
+        return {**_EMPTY_BRIEF, "angle": raw or ""}
     try:
         parsed = json.loads(match.group())
     except json.JSONDecodeError:
-        return {"angle": raw or "", "outline": [], "key_points": [], "target_keywords": []}
+        return {**_EMPTY_BRIEF, "angle": raw or ""}
     return {
         "angle": parsed.get("angle", ""),
         "outline": parsed.get("outline", []),
         "key_points": parsed.get("key_points", []),
         "target_keywords": parsed.get("target_keywords", []),
+        "image_brief": parsed.get("image_brief", ""),
     }
 
 
