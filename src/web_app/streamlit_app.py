@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import html
 import json
 import sys
@@ -17,6 +16,7 @@ from langchain_core.messages import HumanMessage
 
 from src.core.config import get_settings
 from src.utils.export_tools import blog_export_filename, blog_to_markdown, linkedin_post_to_text
+from src.web_app import async_runtime
 from src.workflow.langgraph_workflow import build_graph
 from src.workflow.state_management import (
     derive_session_title,
@@ -24,7 +24,6 @@ from src.workflow.state_management import (
     initial_state,
     new_session_id,
     new_turn_input,
-    open_checkpointer,
 )
 
 # -----------------------------------------------------------------------------
@@ -40,19 +39,31 @@ st.markdown(
 
 
 def _run_async(coro):
-    # SelectorEventLoop, not asyncio.run()'s Windows default ProactorEventLoop —
-    # required by psycopg's async mode (the postgres backend).
-    return asyncio.run(coro, loop_factory=asyncio.SelectorEventLoop)
+    # Dispatches onto async_runtime's persistent background-thread loop rather
+    # than asyncio.run()'ing a fresh one per call. Required for get_persistent_graph's
+    # checkpointer connection to survive across reruns (see async_runtime.py);
+    # also just avoids spinning up a new event loop on every interaction.
+    return async_runtime.run(coro)
 
 
 @st.cache_resource
 def get_graph():
     # Only used for the "memory" backend: InMemorySaver has no event-loop/OS
     # binding, so it's safe to build once and reuse across reruns — which is
-    # required, since a fresh InMemorySaver would be an empty store. "sqlite"
-    # and "postgres" use open_checkpointer() instead, opened fresh per call
-    # (see state_management.get_checkpointer's docstring for why).
+    # required, since a fresh InMemorySaver would be an empty store.
     return build_graph()
+
+
+@st.cache_resource
+def get_persistent_graph():
+    """"sqlite"/"postgres" backends: builds the graph once against a
+    checkpointer connection opened on async_runtime's background loop, then
+    reuses both for the app's lifetime. Must be called from main() before any
+    _run_async() dispatch touches it — st.cache_resource's factory runs
+    synchronously on the calling thread, and async_runtime.run() would
+    deadlock if the factory is entered from a coroutine already running on
+    the background loop it depends on."""
+    return async_runtime.run(async_runtime.build_persistent_graph(get_settings()))
 
 
 @st.cache_resource
@@ -65,8 +76,7 @@ async def _with_graph(op):
     configured backend. op: an async-returning callable taking the graph."""
     settings = get_settings()
     if settings.session_store_backend in ("sqlite", "postgres"):
-        async with open_checkpointer(settings) as saver:
-            return await op(build_graph(checkpointer=saver))
+        return await op(get_persistent_graph())
     return await op(get_graph())
 
 
@@ -386,6 +396,12 @@ def main() -> None:
     registry = get_registry_conn() if settings.session_store_backend in ("sqlite", "postgres") else None
     if registry is not None:
         _render_sidebar(registry)
+        # Warm the persistent checkpointer connection here, on this (the
+        # Streamlit script) thread, before any _run_async() call below can
+        # reach get_persistent_graph() from inside the background loop
+        # instead — see get_persistent_graph's docstring for why that ordering
+        # matters.
+        get_persistent_graph()
 
     for message in st.session_state.chat_log:
         with st.chat_message(message["role"]):
