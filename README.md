@@ -369,15 +369,14 @@ Access the application at `http://localhost:8501`.
 **Purpose:** classifies user intent and routes to the right entry point — new content
 request, refinement of existing content, or research-only.
 
-**Routing logic (planned):**
-```python
-def route_query(state):
-    router_prompt = "Analyze this query and route to: research, blog, linkedin, or image agent"
-    decision = llm.invoke(router_prompt + state["query"])
-    return decision
-```
-Conversation context from the Session Store is included so follow-ups ("make it
-punchier") route correctly without re-explaining the topic.
+**Routing logic:** `OrchestratorAgent.decide()` (`src/agents/query_handler.py`) calls the
+LLM with structured output (`OrchestratorDecision`) to classify `intent`
+(`new_content`/`refinement`) and one or more `targets`
+(`research`/`blog`/`linkedin`/`image`/`package`), then dispatches via LangGraph's
+`Send()`. Conversation context from the Session Store (existing blog/LinkedIn/image
+flags) is included so follow-ups ("make it punchier") route correctly without
+re-explaining the topic; a safety net forces `research` whenever no blog exists yet,
+regardless of what the model decides.
 
 ### Research Agent
 
@@ -456,6 +455,17 @@ Planned split (per the capstone's submission guidelines, targeting 80%+ coverage
 
 ```bash
 uv run pytest tests/ --cov=src --cov-report=term-missing
+```
+
+**Routing accuracy eval:** `scripts/eval_routing.py` runs the Orchestrator's real LLM
+classification against a labeled set of `(query, expected_targets)` cases
+(`src/evaluation/routing_cases.py`) and reports an accuracy score, so a prompt change
+to `ORCHESTRATOR_PROMPT` can be checked for regressions before it ships. Requires a
+configured LLM provider key (see [Environment Variables](#environment-variables)).
+
+```bash
+uv run python scripts/eval_routing.py
+uv run python scripts/eval_routing.py --provider anthropic --threshold 0.9
 ```
 
 ---
