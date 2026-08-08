@@ -1,6 +1,6 @@
 """One-time fix for Supabase's "RLS Disabled in Public" / "Sensitive Columns
 Exposed" advisor warnings on this app's tables (checkpoints, checkpoint_blobs,
-checkpoint_writes, checkpoint_migrations, sessions).
+checkpoint_writes, checkpoint_migrations, sessions, turn_routes).
 
 These tables are only ever read/written through this app's own direct
 psycopg connection (using the Supabase "postgres" role, which has BYPASSRLS),
@@ -29,6 +29,7 @@ TABLES = (
     "checkpoint_writes",
     "checkpoint_migrations",
     "sessions",
+    "turn_routes",
 )
 
 

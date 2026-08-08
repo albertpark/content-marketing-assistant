@@ -33,6 +33,15 @@ T = TypeVar("T")
 
 _loop: asyncio.AbstractEventLoop | None = None
 _lock = threading.Lock()
+# Which background loop (by id) each cache_resource-held graph's checkpointer
+# was opened against. Streamlit's file watcher can reload this module (e.g.
+# after editing state_management.py, which it imports) independently of the
+# @st.cache_resource-cached graph in streamlit_app.py — that reset _loop to a
+# fresh loop/thread while the cached graph's psycopg async connection (and its
+# internal asyncio.Lock) stayed bound to the old, now-orphaned one, raising
+# "bound to a different event loop" on the next call. graph_matches_current_loop
+# lets st.cache_resource(validate=...) detect that and rebuild instead of crashing.
+_graph_loop_ids: dict[int, int] = {}
 # Holds the entered open_checkpointer() context manager alive for the process
 # lifetime. open_checkpointer() is an @asynccontextmanager generator; entering
 # it via __aenter__() without keeping a reference to the CM object itself lets
@@ -51,6 +60,24 @@ def _get_loop() -> asyncio.AbstractEventLoop:
             threading.Thread(target=loop.run_forever, name="checkpointer-loop", daemon=True).start()
             _loop = loop
     return _loop
+
+
+def current_loop_id() -> int:
+    return id(_get_loop())
+
+
+def register_graph_loop(graph: object) -> None:
+    """Records which loop `graph`'s checkpointer was opened against. Call once,
+    right after building it."""
+    _graph_loop_ids[id(graph)] = current_loop_id()
+
+
+def graph_matches_current_loop(graph: object) -> bool:
+    """False once the background loop has been replaced (e.g. this module got
+    hot-reloaded) since `graph` was built — signals st.cache_resource to
+    rebuild rather than reuse a graph whose checkpointer lock can never be
+    acquired again."""
+    return _graph_loop_ids.get(id(graph)) == current_loop_id()
 
 
 def run(coro: Coroutine[None, None, T]) -> T:

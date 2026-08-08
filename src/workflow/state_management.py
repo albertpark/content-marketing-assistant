@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import uuid
 from contextlib import asynccontextmanager
@@ -240,6 +241,18 @@ class SessionRegistry:
                 """
             )
         )
+        self._conn.execute(
+            self._sql(
+                """
+                CREATE TABLE IF NOT EXISTS turn_routes (
+                    session_id TEXT NOT NULL,
+                    turn_index INTEGER NOT NULL,
+                    routes     TEXT NOT NULL,
+                    PRIMARY KEY (session_id, turn_index)
+                )
+                """
+            )
+        )
         self._commit_if_needed()
 
     def record_start(self, session_id: str, title: str) -> None:
@@ -272,6 +285,28 @@ class SessionRegistry:
         )
         cols = ("session_id", "title", "created_at", "updated_at", "turn_count")
         return [dict(zip(cols, row)) for row in cur.fetchall()]
+
+    def record_routes(self, session_id: str, turn_index: int, routes: list[str]) -> None:
+        """Persists one turn's agent-routing trace (the lines shown in the
+        "Agent routing" expander) so it survives switching sessions and
+        reloads — the graph checkpoint itself has no field for this, it's
+        UI-only telemetry derived from streaming debug events."""
+        self._execute(
+            self._sql(
+                "INSERT INTO turn_routes (session_id, turn_index, routes) VALUES (?, ?, ?) "
+                "ON CONFLICT (session_id, turn_index) DO UPDATE SET routes = EXCLUDED.routes"
+            ),
+            (session_id, turn_index, json.dumps(routes)),
+        )
+        self._commit_if_needed()
+
+    def get_routes(self, session_id: str) -> dict[int, list[str]]:
+        """turn_index -> routing lines, for every turn of this session that has one."""
+        cur = self._execute(
+            self._sql("SELECT turn_index, routes FROM turn_routes WHERE session_id = ?"),
+            (session_id,),
+        )
+        return {row[0]: json.loads(row[1]) for row in cur.fetchall()}
 
 
 def get_registry_connection(settings: Settings) -> SessionRegistry:

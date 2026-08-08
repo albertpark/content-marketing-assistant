@@ -56,7 +56,7 @@ def get_graph():
     return build_graph()
 
 
-@st.cache_resource
+@st.cache_resource(validate=async_runtime.graph_matches_current_loop)
 def get_persistent_graph():
     """"sqlite"/"postgres" backends: builds the graph once against a
     checkpointer connection opened on async_runtime's background loop, then
@@ -64,8 +64,15 @@ def get_persistent_graph():
     _run_async() dispatch touches it — st.cache_resource's factory runs
     synchronously on the calling thread, and async_runtime.run() would
     deadlock if the factory is entered from a coroutine already running on
-    the background loop it depends on."""
-    return async_runtime.run(async_runtime.build_persistent_graph(get_settings()))
+    the background loop it depends on.
+
+    `validate` rebuilds this if async_runtime's background loop was ever
+    replaced after this graph was built (see _graph_loop_ids' docstring) —
+    otherwise a stale graph's checkpointer lock raises "bound to a different
+    event loop" the next time it's used."""
+    graph = async_runtime.run(async_runtime.build_persistent_graph(get_settings()))
+    async_runtime.register_graph_loop(graph)
+    return graph
 
 
 @st.cache_resource
@@ -154,12 +161,17 @@ async def _run_turn(
     blog_placeholder=None,
     linkedin_placeholder=None,
     ctx=None,
+    route_log: list[str] | None = None,
 ) -> None:
     """Runs the graph. When `status` (an st.status container) is given, streams
     per-node start/finish events into it live. When blog_placeholder /
     linkedin_placeholder (st.empty() containers) are given, also streams the
     blog post body / LinkedIn post text into them token-by-token as they're
     generated, instead of only appearing once the whole run finishes.
+
+    `route_log`: if given, every line written to `status` is also appended
+    here, so the routing trace can be replayed (e.g. in an expander) after
+    this turn's live `st.status` widget is gone post-rerun.
 
     `ctx`: caller's ScriptRunContext (get_script_run_ctx()). This coroutine
     runs on async_runtime's shared background thread, not the Streamlit
@@ -188,9 +200,15 @@ async def _run_turn(
                 label, detail = _node_progress_line(node_name, provider_label)
                 if payload["type"] == "task":
                     status.update(label=f"Working — {label}...")
-                    status.write(f"▶ {label} started" + (f" — {detail}" if detail else ""))
+                    line = f"▶ {label} started" + (f" — {detail}" if detail else "")
+                    status.write(line)
+                    if route_log is not None:
+                        route_log.append(line)
                 elif payload["type"] == "task_result":
-                    status.write(f"✓ {label} done")
+                    line = f"✓ {label} done"
+                    status.write(line)
+                    if route_log is not None:
+                        route_log.append(line)
             elif mode == "messages":
                 msg_chunk, metadata = payload
                 node_name = metadata.get("langgraph_node")
@@ -221,14 +239,31 @@ async def _approve_draft(thread_id: str) -> None:
     await _with_graph(lambda graph: graph.aupdate_state(config, {"human_approved_override": True}))
 
 
-def _chat_log_from_state(state: dict) -> list[dict]:
+def _chat_log_from_state(state: dict, routes_by_turn: dict[int, list[str]] | None = None) -> list[dict]:
     """Reconstructs the visible transcript when switching to a resumed session
     — st.session_state.chat_log is local to this browser tab and won't have
-    that session's history otherwise."""
+    that session's history otherwise.
+
+    No graph node ever appends a non-HumanMessage to `messages` (agent output
+    lives in dedicated state keys like blog_post/linkedin_post instead), so
+    every entry here is actually a HumanMessage — a synthetic assistant reply
+    is added after each one to mirror the live turn's "Done — see the results
+    below." bubble, with that turn's persisted routing trace (if any) attached.
+    """
+    routes_by_turn = routes_by_turn or {}
     log = []
+    turn_index = 0
     for message in state.get("messages", []):
         if isinstance(message, HumanMessage):
+            turn_index += 1
             log.append({"role": "user", "content": message.content})
+            log.append(
+                {
+                    "role": "assistant",
+                    "content": "Done — see the results below.",
+                    "routes": routes_by_turn.get(turn_index, []),
+                }
+            )
         else:
             log.append({"role": "assistant", "content": "Done — see the results below."})
     return log
@@ -283,7 +318,8 @@ def _render_sidebar(registry) -> None:
             if clicked:
                 st.session_state.session_id = session["session_id"]
                 resumed_state = _run_async(_read_state(session["session_id"]))
-                st.session_state.chat_log = _chat_log_from_state(resumed_state)
+                routes_by_turn = registry.get_routes(session["session_id"])
+                st.session_state.chat_log = _chat_log_from_state(resumed_state, routes_by_turn)
                 st.rerun()
 
 
@@ -417,6 +453,11 @@ def main() -> None:
     for message in st.session_state.chat_log:
         with st.chat_message(message["role"]):
             st.write(message["content"])
+            routes = message.get("routes")
+            if routes:
+                with st.expander(f"Agent routing ({len(routes)} steps)"):
+                    for line in routes:
+                        st.write(line)
 
     user_query = st.chat_input("What content should I create?")
     if user_query:
@@ -426,6 +467,10 @@ def main() -> None:
 
         thread_id = st.session_state.session_id
         existing_state = _run_async(_read_state(thread_id))
+        # 1-based, mirrors sessions.turn_count: counts prior HumanMessages (one per
+        # turn) so this turn's routing trace can be keyed and looked up the same
+        # way whether or not the registry backs the session store.
+        turn_index = sum(1 for m in existing_state.get("messages", []) if isinstance(m, HumanMessage)) + 1
         if not existing_state:
             input_state = initial_state(thread_id, user_query, llm_provider=selected_provider)
             if registry is not None:
@@ -435,12 +480,13 @@ def main() -> None:
             if registry is not None:
                 registry.record_turn(thread_id)
 
+        route_log: list[str] = []
         with st.chat_message("assistant"):
             # Created before the status block so the growing blog/LinkedIn text
             # renders above the collapsed progress pill, not hidden inside it.
             blog_placeholder = st.empty()
             linkedin_placeholder = st.empty()
-            with st.status("Working...", expanded=False) as status:
+            with st.status("Working...", expanded=True) as status:
                 try:
                     _run_async(
                         _run_turn(
@@ -451,6 +497,7 @@ def main() -> None:
                             blog_placeholder=blog_placeholder,
                             linkedin_placeholder=linkedin_placeholder,
                             ctx=get_script_run_ctx(),
+                            route_log=route_log,
                         )
                     )
                 except Exception:
@@ -458,7 +505,11 @@ def main() -> None:
                     raise
                 status.update(label="Done", state="complete")
 
-        st.session_state.chat_log.append({"role": "assistant", "content": "Done — see the results below."})
+        st.session_state.chat_log.append(
+            {"role": "assistant", "content": "Done — see the results below.", "routes": route_log}
+        )
+        if registry is not None:
+            registry.record_routes(thread_id, turn_index, route_log)
         st.rerun()
 
     state = _run_async(_read_state(st.session_state.session_id))
