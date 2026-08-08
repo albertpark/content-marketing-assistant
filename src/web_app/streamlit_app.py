@@ -276,7 +276,7 @@ def _render_sidebar(registry) -> None:
             clicked = st.button(
                 ("• " if is_current else "") + session["title"],
                 key=f"session_{session['session_id']}",
-                help=f"Updated {_format_updated_at(session['updated_at'])} · {session['turn_count']} turn(s)",
+                # help=f"Updated {_format_updated_at(session['updated_at'])} · {session['turn_count']} turn(s)",
                 use_container_width=True,
                 disabled=is_current,
             )
