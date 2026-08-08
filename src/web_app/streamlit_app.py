@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 import json
 import sys
+import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -13,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import streamlit as st
 import streamlit.components.v1 as components
 from langchain_core.messages import HumanMessage
+from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ctx
 
 from src.core.config import get_settings
 from src.utils.export_tools import blog_export_filename, blog_to_markdown, linkedin_post_to_text
@@ -151,12 +153,19 @@ async def _run_turn(
     provider_label: str = "",
     blog_placeholder=None,
     linkedin_placeholder=None,
+    ctx=None,
 ) -> None:
     """Runs the graph. When `status` (an st.status container) is given, streams
     per-node start/finish events into it live. When blog_placeholder /
     linkedin_placeholder (st.empty() containers) are given, also streams the
     blog post body / LinkedIn post text into them token-by-token as they're
-    generated, instead of only appearing once the whole run finishes."""
+    generated, instead of only appearing once the whole run finishes.
+
+    `ctx`: caller's ScriptRunContext (get_script_run_ctx()). This coroutine
+    runs on async_runtime's shared background thread, not the Streamlit
+    script thread, so st.* calls need a context re-attached — and since that
+    thread is shared across concurrent sessions, it's re-attached after every
+    await, not just once, in case another session's coroutine ran in between."""
     config = {"configurable": {"thread_id": thread_id}}
     streaming = status is not None or blog_placeholder is not None or linkedin_placeholder is not None
 
@@ -168,6 +177,8 @@ async def _run_turn(
         async for mode, payload in graph.astream(
             input_state, config=config, stream_mode=["debug", "messages"]
         ):
+            if ctx is not None:
+                add_script_run_ctx(threading.current_thread(), ctx)
             if mode == "debug":
                 if status is None:
                     continue
@@ -439,6 +450,7 @@ def main() -> None:
                             provider_label=_PROVIDER_LABELS[selected_provider],
                             blog_placeholder=blog_placeholder,
                             linkedin_placeholder=linkedin_placeholder,
+                            ctx=get_script_run_ctx(),
                         )
                     )
                 except Exception:
