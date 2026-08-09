@@ -41,6 +41,39 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# Each session row in the sidebar (see _render_active_session_row) wraps its
+# title button + "⋮" menu trigger in st.container(key=f"session_row_{id}"),
+# which Streamlit renders as a div carrying a "st-key-session_row_<id>"
+# class. [class*=...] matches that prefix across every session's row in one
+# rule. Stripping the buttons' own chip borders/background and giving the
+# row itself a single hover highlight makes the title and the menu trigger
+# read as one seamless list item (title left-aligned, "⋮" trailing) instead
+# of two visibly separate button chips sitting next to each other.
+st.markdown(
+    """
+    <style>
+    div[class*="st-key-session_row_"] div[data-testid="stHorizontalBlock"] {
+        gap: 0.25rem;
+        align-items: center;
+    }
+    div[class*="st-key-session_row_"] button {
+        border: none !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        justify-content: flex-start !important;
+    }
+    div[class*="st-key-session_row_"] button:disabled {
+        background: rgba(128, 128, 128, 0.12) !important;
+        opacity: 1 !important;
+    }
+    div[class*="st-key-session_row_"] button:hover:not(:disabled) {
+        background: rgba(128, 128, 128, 0.15) !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 
 def _run_async(coro):
     # Dispatches onto async_runtime's persistent background-thread loop rather
@@ -368,12 +401,14 @@ def _open_session(registry, session_id: str) -> None:
 
 
 def _render_active_session_row(registry, session: dict) -> None:
-    """One row of the main (non-trashed) session list: title button, a
-    rename (pencil) trigger, and a "⋮" menu holding Archive/Unarchive and
-    Delete (soft — moves it to Trash) — mirrors a typical chat app's
-    per-item options menu rather than always-visible icon buttons. While
-    renaming, the same two columns are repurposed: title becomes a text
-    input, the menu column becomes Save/Cancel — no new columns needed."""
+    """One row of the main (non-trashed) session list: a title button plus a
+    "⋮" menu holding Rename, Archive/Unarchive, and Delete (soft — moves it
+    to Trash) — mirrors a typical chat app's per-item options menu rather
+    than several always-visible icon buttons. The whole row is wrapped in a
+    keyed container so _inject_session_row_css's rule can visually fuse the
+    title button and the menu trigger into one seamless row. While renaming,
+    the same two columns are repurposed: title becomes a text input, the
+    menu column becomes Save/Cancel — no new columns needed."""
     session_id = session["session_id"]
     is_current = session_id == st.session_state.session_id
     editing_key = f"editing_title_{session_id}"
@@ -381,104 +416,128 @@ def _render_active_session_row(registry, session: dict) -> None:
     confirm_delete_key = f"confirm_delete_{session_id}"
     is_editing = st.session_state.get(editing_key, False)
 
-    title_col, action_col = st.columns([6, 2])
+    with st.container(key=f"session_row_{session_id}"):
+        title_col, action_col = st.columns([6, 2], gap="small")
 
-    if is_editing:
-        with title_col:
-            st.text_input(
-                "", value=session["title"], key=input_key, label_visibility="collapsed", help="Rename session"
-            )
-        save_col, cancel_col = action_col.columns(2)
-        with save_col:
-            if st.button("", icon="✅", key=f"save_title_{session_id}", help="Save", use_container_width=True):
-                typed = st.session_state.get(input_key, "")
-                if derive_session_title(typed):
-                    registry.rename_session(session_id, typed)
+        if is_editing:
+            with title_col:
+                st.text_input(
+                    "", value=session["title"], key=input_key, label_visibility="collapsed", help="Rename session"
+                )
+            save_col, cancel_col = action_col.columns(2)
+            with save_col:
+                if st.button("", icon="✅", key=f"save_title_{session_id}", help="Save", use_container_width=True):
+                    typed = st.session_state.get(input_key, "")
+                    if derive_session_title(typed):
+                        registry.rename_session(session_id, typed)
+                        st.session_state.pop(editing_key, None)
+                        st.session_state.pop(input_key, None)
+                        st.rerun()
+                    else:
+                        st.caption("Title can't be empty.")
+            with cancel_col:
+                if st.button(
+                    "", icon="✖️", key=f"cancel_title_{session_id}", help="Cancel", use_container_width=True
+                ):
                     st.session_state.pop(editing_key, None)
                     st.session_state.pop(input_key, None)
                     st.rerun()
-                else:
-                    st.caption("Title can't be empty.")
-        with cancel_col:
-            if st.button("", icon="✖️", key=f"cancel_title_{session_id}", help="Cancel", use_container_width=True):
-                st.session_state.pop(editing_key, None)
-                st.session_state.pop(input_key, None)
-                st.rerun()
-        return
+            return
 
-    open_col, pencil_col = title_col.columns([5, 1])
-    with open_col:
-        clicked = st.button(
-            ("• " if is_current else "") + session["title"],
-            key=f"session_{session_id}",
-            # help=f"Updated {_format_updated_at(session['updated_at'])} · {session['turn_count']} turn(s)",
-            use_container_width=True,
-            disabled=is_current,
-        )
-        if clicked:
-            _open_session(registry, session_id)
-            st.rerun()
-    with pencil_col:
-        if st.button(
-            "", icon="✏️", key=f"rename_trigger_{session_id}", help="Rename session", use_container_width=True
-        ):
-            st.session_state[editing_key] = True
-            st.rerun()
-    with action_col:
-        with st.popover("", icon=":material/more_vert:", help="More actions", use_container_width=True):
-            if st.session_state.get(confirm_delete_key, False):
-                st.write(
-                    f"Delete **{session['title']}**? It moves to Trash, recoverable for {_retention_days()} day(s)."
-                )
-                confirm_col, cancel_col = st.columns(2)
-                with confirm_col:
-                    if st.button(
-                        "Delete", key=f"confirm_delete_btn_{session_id}", type="primary", use_container_width=True
-                    ):
-                        registry.soft_delete_session(session_id)
-                        st.session_state.pop(confirm_delete_key, None)
-                        if is_current:
+        with title_col:
+            clicked = st.button(
+                ("• " if is_current else "") + session["title"],
+                key=f"session_{session_id}",
+                # help=f"Updated {_format_updated_at(session['updated_at'])} · {session['turn_count']} turn(s)",
+                use_container_width=True,
+                disabled=is_current,
+            )
+            if clicked:
+                _open_session(registry, session_id)
+                st.rerun()
+        with action_col:
+            with st.popover("", icon=":material/more_vert:", help="More actions", use_container_width=True):
+                if st.session_state.get(confirm_delete_key, False):
+                    st.write(
+                        f"Delete **{session['title']}**? It moves to Trash, recoverable for "
+                        f"{_retention_days()} day(s)."
+                    )
+                    confirm_col, cancel_col = st.columns(2)
+                    with confirm_col:
+                        if st.button(
+                            "Delete",
+                            key=f"confirm_delete_btn_{session_id}",
+                            type="primary",
+                            use_container_width=True,
+                        ):
+                            registry.soft_delete_session(session_id)
+                            st.session_state.pop(confirm_delete_key, None)
+                            if is_current:
+                                _switch_to_new_session()
+                            st.rerun()
+                    with cancel_col:
+                        if st.button("Cancel", key=f"cancel_delete_btn_{session_id}", use_container_width=True):
+                            st.session_state.pop(confirm_delete_key, None)
+                            st.rerun()
+                else:
+                    if st.button("✏️ Rename", key=f"rename_trigger_{session_id}", use_container_width=True):
+                        st.session_state[editing_key] = True
+                        st.rerun()
+                    archive_label = "↩️ Unarchive" if session["archived"] else "🗄️ Archive"
+                    if st.button(archive_label, key=f"archive_toggle_{session_id}", use_container_width=True):
+                        was_archived = bool(session["archived"])
+                        registry.set_archived(session_id, not was_archived)
+                        if is_current and not was_archived:
                             _switch_to_new_session()
                         st.rerun()
-                with cancel_col:
-                    if st.button("Cancel", key=f"cancel_delete_btn_{session_id}", use_container_width=True):
-                        st.session_state.pop(confirm_delete_key, None)
+                    if st.button("🗑️ Delete", key=f"delete_trigger_{session_id}", use_container_width=True):
+                        st.session_state[confirm_delete_key] = True
                         st.rerun()
-            else:
-                archive_label = "↩️ Unarchive" if session["archived"] else "🗄️ Archive"
-                if st.button(archive_label, key=f"archive_toggle_{session_id}", use_container_width=True):
-                    was_archived = bool(session["archived"])
-                    registry.set_archived(session_id, not was_archived)
-                    if is_current and not was_archived:
-                        _switch_to_new_session()
-                    st.rerun()
-                if st.button("🗑️ Delete", key=f"delete_trigger_{session_id}", use_container_width=True):
-                    st.session_state[confirm_delete_key] = True
-                    st.rerun()
 
 
 def _render_trashed_session_row(registry, session: dict) -> None:
-    """One row of the Trash list: restore on the left, permanent delete (with
-    its own confirmation, since this one purges the checkpointer thread too
-    and can't be undone) on the far right."""
+    """One row of the Trash list: title + expiry countdown, then a "⋮" menu
+    holding Restore and Delete forever — same pattern as
+    _render_active_session_row's menu, for consistency. Delete forever keeps
+    its own confirm step inside the menu (mirroring the active row's Delete),
+    since this one also purges the checkpointer thread and can't be undone."""
     session_id = session["session_id"]
-    title_col, restore_col, purge_col = st.columns([6, 1, 1])
-    with title_col:
-        st.caption(session["title"])
-        st.caption(_format_days_left(session["deleted_at"], _retention_days()))
-    with restore_col:
-        if st.button("", icon="↩️", key=f"restore_{session_id}", help="Restore session", use_container_width=True):
-            registry.restore_session(session_id)
-            st.rerun()
-    with purge_col:
-        with st.popover("", icon="🗑️", help="Delete forever", use_container_width=True):
-            st.write(f"Permanently delete **{session['title']}**? This can't be undone.")
-            if st.button("Delete forever", key=f"purge_{session_id}", type="primary"):
-                _run_async(_delete_session_thread(session_id))
-                registry.hard_delete_session(session_id)
-                if session_id == st.session_state.session_id:
-                    _switch_to_new_session()
-                st.rerun()
+    confirm_purge_key = f"confirm_purge_{session_id}"
+
+    with st.container(key=f"session_row_{session_id}"):
+        title_col, action_col = st.columns([6, 2], gap="small")
+        with title_col:
+            st.caption(session["title"])
+            st.caption(_format_days_left(session["deleted_at"], _retention_days()))
+        with action_col:
+            with st.popover("", icon=":material/more_vert:", help="More actions", use_container_width=True):
+                if st.session_state.get(confirm_purge_key, False):
+                    st.write(f"Permanently delete **{session['title']}**? This can't be undone.")
+                    confirm_col, cancel_col = st.columns(2)
+                    with confirm_col:
+                        if st.button(
+                            "Delete forever",
+                            key=f"confirm_purge_btn_{session_id}",
+                            type="primary",
+                            use_container_width=True,
+                        ):
+                            _run_async(_delete_session_thread(session_id))
+                            registry.hard_delete_session(session_id)
+                            st.session_state.pop(confirm_purge_key, None)
+                            if session_id == st.session_state.session_id:
+                                _switch_to_new_session()
+                            st.rerun()
+                    with cancel_col:
+                        if st.button("Cancel", key=f"cancel_purge_btn_{session_id}", use_container_width=True):
+                            st.session_state.pop(confirm_purge_key, None)
+                            st.rerun()
+                else:
+                    if st.button("↩️ Restore", key=f"restore_{session_id}", use_container_width=True):
+                        registry.restore_session(session_id)
+                        st.rerun()
+                    if st.button("🗑️ Delete forever", key=f"purge_trigger_{session_id}", use_container_width=True):
+                        st.session_state[confirm_purge_key] = True
+                        st.rerun()
 
 
 def _retention_days() -> int:
