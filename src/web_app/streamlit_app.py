@@ -368,25 +368,28 @@ def _open_session(registry, session_id: str) -> None:
 
 
 def _render_active_session_row(registry, session: dict) -> None:
-    """One row of the main (non-trashed) session list: title button, then
-    archive/unarchive, then delete (soft — moves it to Trash) on the far
-    right, per the sidebar's icon layout. While renaming, the same three
-    columns are repurposed: title becomes a text input, archive becomes
-    Save, delete becomes Cancel — no new columns needed."""
+    """One row of the main (non-trashed) session list: title button, a
+    rename (pencil) trigger, and a "⋮" menu holding Archive/Unarchive and
+    Delete (soft — moves it to Trash) — mirrors a typical chat app's
+    per-item options menu rather than always-visible icon buttons. While
+    renaming, the same two columns are repurposed: title becomes a text
+    input, the menu column becomes Save/Cancel — no new columns needed."""
     session_id = session["session_id"]
     is_current = session_id == st.session_state.session_id
     editing_key = f"editing_title_{session_id}"
     input_key = f"title_input_{session_id}"
+    confirm_delete_key = f"confirm_delete_{session_id}"
     is_editing = st.session_state.get(editing_key, False)
 
-    title_col, archive_col, delete_col = st.columns([6, 1, 1])
+    title_col, action_col = st.columns([6, 2])
 
     if is_editing:
         with title_col:
             st.text_input(
                 "", value=session["title"], key=input_key, label_visibility="collapsed", help="Rename session"
             )
-        with archive_col:
+        save_col, cancel_col = action_col.columns(2)
+        with save_col:
             if st.button("", icon="✅", key=f"save_title_{session_id}", help="Save", use_container_width=True):
                 typed = st.session_state.get(input_key, "")
                 if derive_session_title(typed):
@@ -396,7 +399,7 @@ def _render_active_session_row(registry, session: dict) -> None:
                     st.rerun()
                 else:
                     st.caption("Title can't be empty.")
-        with delete_col:
+        with cancel_col:
             if st.button("", icon="✖️", key=f"cancel_title_{session_id}", help="Cancel", use_container_width=True):
                 st.session_state.pop(editing_key, None)
                 st.session_state.pop(input_key, None)
@@ -421,29 +424,37 @@ def _render_active_session_row(registry, session: dict) -> None:
         ):
             st.session_state[editing_key] = True
             st.rerun()
-    with archive_col:
-        if session["archived"]:
-            if st.button(
-                "", icon="↩️", key=f"unarchive_{session_id}", help="Unarchive session", use_container_width=True
-            ):
-                registry.set_archived(session_id, False)
-                st.rerun()
-        else:
-            if st.button(
-                "", icon="🗄️", key=f"archive_{session_id}", help="Archive session", use_container_width=True
-            ):
-                registry.set_archived(session_id, True)
-                if is_current:
-                    _switch_to_new_session()
-                st.rerun()
-    with delete_col:
-        with st.popover("", icon="🗑️", help="Delete session", use_container_width=True):
-            st.write(f"Delete **{session['title']}**? It moves to Trash, recoverable for {_retention_days()} day(s).")
-            if st.button("Delete", key=f"delete_{session_id}", type="primary"):
-                registry.soft_delete_session(session_id)
-                if is_current:
-                    _switch_to_new_session()
-                st.rerun()
+    with action_col:
+        with st.popover("", icon=":material/more_vert:", help="More actions", use_container_width=True):
+            if st.session_state.get(confirm_delete_key, False):
+                st.write(
+                    f"Delete **{session['title']}**? It moves to Trash, recoverable for {_retention_days()} day(s)."
+                )
+                confirm_col, cancel_col = st.columns(2)
+                with confirm_col:
+                    if st.button(
+                        "Delete", key=f"confirm_delete_btn_{session_id}", type="primary", use_container_width=True
+                    ):
+                        registry.soft_delete_session(session_id)
+                        st.session_state.pop(confirm_delete_key, None)
+                        if is_current:
+                            _switch_to_new_session()
+                        st.rerun()
+                with cancel_col:
+                    if st.button("Cancel", key=f"cancel_delete_btn_{session_id}", use_container_width=True):
+                        st.session_state.pop(confirm_delete_key, None)
+                        st.rerun()
+            else:
+                archive_label = "↩️ Unarchive" if session["archived"] else "🗄️ Archive"
+                if st.button(archive_label, key=f"archive_toggle_{session_id}", use_container_width=True):
+                    was_archived = bool(session["archived"])
+                    registry.set_archived(session_id, not was_archived)
+                    if is_current and not was_archived:
+                        _switch_to_new_session()
+                    st.rerun()
+                if st.button("🗑️ Delete", key=f"delete_trigger_{session_id}", use_container_width=True):
+                    st.session_state[confirm_delete_key] = True
+                    st.rerun()
 
 
 def _render_trashed_session_row(registry, session: dict) -> None:
