@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import html
 import json
+import math
 import sys
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -341,6 +342,19 @@ def _format_updated_at(iso_timestamp: str) -> str:
     return f"{dt.strftime('%b')} {dt.day}, {dt.year}, {dt.strftime('%I:%M %p').lstrip('0')}"
 
 
+def _format_days_left(deleted_at_iso: str, retention_days: int) -> str:
+    try:
+        deleted_at = datetime.fromisoformat(deleted_at_iso)
+    except ValueError:
+        return "Expiration unknown"
+    expires_at = deleted_at + timedelta(days=retention_days)
+    remaining = expires_at - datetime.now(timezone.utc)
+    if remaining.total_seconds() <= 0:
+        return "Pending cleanup"
+    days_left = math.ceil(remaining.total_seconds() / 86400)
+    return f"Expires in {days_left} day" + ("" if days_left == 1 else "s")
+
+
 def _switch_to_new_session() -> None:
     st.session_state.session_id = new_session_id()
     st.session_state.chat_log = []
@@ -356,11 +370,41 @@ def _open_session(registry, session_id: str) -> None:
 def _render_active_session_row(registry, session: dict) -> None:
     """One row of the main (non-trashed) session list: title button, then
     archive/unarchive, then delete (soft — moves it to Trash) on the far
-    right, per the sidebar's icon layout."""
+    right, per the sidebar's icon layout. While renaming, the same three
+    columns are repurposed: title becomes a text input, archive becomes
+    Save, delete becomes Cancel — no new columns needed."""
     session_id = session["session_id"]
     is_current = session_id == st.session_state.session_id
+    editing_key = f"editing_title_{session_id}"
+    input_key = f"title_input_{session_id}"
+    is_editing = st.session_state.get(editing_key, False)
+
     title_col, archive_col, delete_col = st.columns([6, 1, 1])
-    with title_col:
+
+    if is_editing:
+        with title_col:
+            st.text_input(
+                "", value=session["title"], key=input_key, label_visibility="collapsed", help="Rename session"
+            )
+        with archive_col:
+            if st.button("", icon="✅", key=f"save_title_{session_id}", help="Save", use_container_width=True):
+                typed = st.session_state.get(input_key, "")
+                if derive_session_title(typed):
+                    registry.rename_session(session_id, typed)
+                    st.session_state.pop(editing_key, None)
+                    st.session_state.pop(input_key, None)
+                    st.rerun()
+                else:
+                    st.caption("Title can't be empty.")
+        with delete_col:
+            if st.button("", icon="✖️", key=f"cancel_title_{session_id}", help="Cancel", use_container_width=True):
+                st.session_state.pop(editing_key, None)
+                st.session_state.pop(input_key, None)
+                st.rerun()
+        return
+
+    open_col, pencil_col = title_col.columns([5, 1])
+    with open_col:
         clicked = st.button(
             ("• " if is_current else "") + session["title"],
             key=f"session_{session_id}",
@@ -370,6 +414,12 @@ def _render_active_session_row(registry, session: dict) -> None:
         )
         if clicked:
             _open_session(registry, session_id)
+            st.rerun()
+    with pencil_col:
+        if st.button(
+            "", icon="✏️", key=f"rename_trigger_{session_id}", help="Rename session", use_container_width=True
+        ):
+            st.session_state[editing_key] = True
             st.rerun()
     with archive_col:
         if session["archived"]:
@@ -404,6 +454,7 @@ def _render_trashed_session_row(registry, session: dict) -> None:
     title_col, restore_col, purge_col = st.columns([6, 1, 1])
     with title_col:
         st.caption(session["title"])
+        st.caption(_format_days_left(session["deleted_at"], _retention_days()))
     with restore_col:
         if st.button("", icon="↩️", key=f"restore_{session_id}", help="Restore session", use_container_width=True):
             registry.restore_session(session_id)
@@ -430,13 +481,29 @@ def _render_sidebar(registry) -> None:
             _switch_to_new_session()
             st.rerun()
 
+        search_query = st.text_input(
+            "Search sessions",
+            key="session_search",
+            placeholder="Search sessions…",
+            label_visibility="collapsed",
+        )
+
         st.divider()
         all_sessions = registry.list_sessions(include_archived=True)
         active_sessions = [s for s in all_sessions if not s["archived"]]
         archived_sessions = [s for s in all_sessions if s["archived"]]
+        trashed_sessions = registry.list_trashed_sessions()
+
+        query = search_query.strip().lower()
+        if query:
+            active_sessions = [s for s in active_sessions if query in s["title"].lower()]
+            archived_sessions = [s for s in archived_sessions if query in s["title"].lower()]
+            trashed_sessions = [s for s in trashed_sessions if query in s["title"].lower()]
 
         for session in active_sessions:
             _render_active_session_row(registry, session)
+        if query and not active_sessions:
+            st.caption("No sessions match your search.")
 
         if archived_sessions:
             st.divider()
@@ -444,11 +511,9 @@ def _render_sidebar(registry) -> None:
                 for session in archived_sessions:
                     _render_active_session_row(registry, session)
 
-        trashed_sessions = registry.list_trashed_sessions()
         if trashed_sessions:
             st.divider()
             with st.expander(f"Trash ({len(trashed_sessions)})"):
-                st.caption(f"Permanently deleted after {_retention_days()} day(s).")
                 for session in trashed_sessions:
                     _render_trashed_session_row(registry, session)
 

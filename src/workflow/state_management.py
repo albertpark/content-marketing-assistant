@@ -338,6 +338,24 @@ class SessionRegistry:
         )
         self._commit_if_needed()
 
+    def rename_session(self, session_id: str, title: str) -> None:
+        """Updates a session's display title after creation (record_start()
+        only sets it once, immutably). Re-normalizes via
+        derive_session_title() — same rule as the initial title — and
+        no-ops if the normalized result is empty, so a title can never be
+        blanked out. Does NOT touch updated_at: a rename is a metadata edit,
+        not conversation activity, and must not reorder the sidebar's
+        most-recently-updated list (mirrors set_archived, which also leaves
+        updated_at untouched)."""
+        normalized = derive_session_title(title)
+        if not normalized:
+            return
+        self._execute(
+            self._sql("UPDATE sessions SET title = ? WHERE session_id = ?"),
+            (normalized, session_id),
+        )
+        self._commit_if_needed()
+
     def soft_delete_session(self, session_id: str) -> None:
         """Marks a session deleted without touching its data — it drops out of
         the sidebar's active/archived lists but stays fully intact (registry
