@@ -496,27 +496,48 @@ def _render_active_session_row(registry, session: dict) -> None:
 
 
 def _render_trashed_session_row(registry, session: dict) -> None:
-    """One row of the Trash list: restore on the left, permanent delete (with
-    its own confirmation, since this one purges the checkpointer thread too
-    and can't be undone) on the far right."""
+    """One row of the Trash list: title + expiry countdown, then a "⋮" menu
+    holding Restore and Delete forever — same pattern as
+    _render_active_session_row's menu, for consistency. Delete forever keeps
+    its own confirm step inside the menu (mirroring the active row's Delete),
+    since this one also purges the checkpointer thread and can't be undone."""
     session_id = session["session_id"]
-    title_col, restore_col, purge_col = st.columns([6, 1, 1])
-    with title_col:
-        st.caption(session["title"])
-        st.caption(_format_days_left(session["deleted_at"], _retention_days()))
-    with restore_col:
-        if st.button("", icon="↩️", key=f"restore_{session_id}", help="Restore session", use_container_width=True):
-            registry.restore_session(session_id)
-            st.rerun()
-    with purge_col:
-        with st.popover("", icon="🗑️", help="Delete forever", use_container_width=True):
-            st.write(f"Permanently delete **{session['title']}**? This can't be undone.")
-            if st.button("Delete forever", key=f"purge_{session_id}", type="primary"):
-                _run_async(_delete_session_thread(session_id))
-                registry.hard_delete_session(session_id)
-                if session_id == st.session_state.session_id:
-                    _switch_to_new_session()
-                st.rerun()
+    confirm_purge_key = f"confirm_purge_{session_id}"
+
+    with st.container(key=f"session_row_{session_id}"):
+        title_col, action_col = st.columns([6, 2], gap="small")
+        with title_col:
+            st.caption(session["title"])
+            st.caption(_format_days_left(session["deleted_at"], _retention_days()))
+        with action_col:
+            with st.popover("", icon=":material/more_vert:", help="More actions", use_container_width=True):
+                if st.session_state.get(confirm_purge_key, False):
+                    st.write(f"Permanently delete **{session['title']}**? This can't be undone.")
+                    confirm_col, cancel_col = st.columns(2)
+                    with confirm_col:
+                        if st.button(
+                            "Delete forever",
+                            key=f"confirm_purge_btn_{session_id}",
+                            type="primary",
+                            use_container_width=True,
+                        ):
+                            _run_async(_delete_session_thread(session_id))
+                            registry.hard_delete_session(session_id)
+                            st.session_state.pop(confirm_purge_key, None)
+                            if session_id == st.session_state.session_id:
+                                _switch_to_new_session()
+                            st.rerun()
+                    with cancel_col:
+                        if st.button("Cancel", key=f"cancel_purge_btn_{session_id}", use_container_width=True):
+                            st.session_state.pop(confirm_purge_key, None)
+                            st.rerun()
+                else:
+                    if st.button("↩️ Restore", key=f"restore_{session_id}", use_container_width=True):
+                        registry.restore_session(session_id)
+                        st.rerun()
+                    if st.button("🗑️ Delete forever", key=f"purge_trigger_{session_id}", use_container_width=True):
+                        st.session_state[confirm_purge_key] = True
+                        st.rerun()
 
 
 def _retention_days() -> int:
