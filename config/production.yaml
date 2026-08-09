@@ -11,6 +11,7 @@ research:
 
 image:
   primary_provider: openai
+  primary_model: gpt-image-1-mini
   fallback_provider: null
 
 session_store:

@@ -34,6 +34,7 @@ class Settings:
     anthropic_model: str
     google_model: str
     perplexity_model: str
+    image_model: str
 
     llm_primary_provider: str
     llm_fallback_provider: str
@@ -107,6 +108,7 @@ def load_settings(environment: str | None = None) -> Settings:
         anthropic_model=os.getenv("ANTHROPIC_MODEL", ""),
         google_model=os.getenv("GOOGLE_MODEL", "gemini-2.0-flash"),
         perplexity_model=os.getenv("PERPLEXITY_MODEL", ""),
+        image_model=os.getenv("IMAGE_MODEL") or image.get("primary_model", "gpt-image-1-mini"),
         llm_primary_provider=llm.get("primary_provider", "openai"),
         llm_fallback_provider=llm.get("fallback_provider", "anthropic"),
         research_primary_provider=research.get("primary_provider", "serpapi"),

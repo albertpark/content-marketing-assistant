@@ -66,17 +66,17 @@ def _get_image_client() -> OpenAI:
 @with_retry(retry_on=(ProviderError,))
 @rate_limited()
 def generate_image(prompt: str, size: str = "1024x1024", quality: str = "auto") -> dict:
-    """Generates an image via OpenAI's gpt-image-1-mini — the cheapest current
-    image model (dall-e-3/dall-e-2 are discontinued; "model does not exist" for
-    this account). Returns {"url": ...} if the API gives a hosted URL, or
-    {"path": ...} to a locally-saved file if it returns base64 data instead
-    (gpt-image-1 family typically returns b64_json, not a url, unlike the
-    discontinued DALL-E endpoints) — callers should check whichever key is
-    non-None. Raises ProviderError on transient failures so with_retry can retry
-    it."""
+    """Generates an image via OpenAI (model set by IMAGE_MODEL, default
+    gpt-image-1-mini — the cheapest current image model; dall-e-3/dall-e-2 are
+    discontinued and return "model does not exist" for this account). Returns
+    {"url": ...} if the API gives a hosted URL, or {"path": ...} to a
+    locally-saved file if it returns base64 data instead (gpt-image-1 family
+    typically returns b64_json, not a url, unlike the discontinued DALL-E
+    endpoints) — callers should check whichever key is non-None. Raises
+    ProviderError on transient failures so with_retry can retry it."""
     try:
         response = _get_image_client().images.generate(
-            model="gpt-image-1-mini",
+            model=get_settings().image_model,
             prompt=prompt,
             size=size,
             quality=quality,
