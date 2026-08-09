@@ -6,7 +6,7 @@ import json
 import sqlite3
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Annotated, AsyncIterator, TypedDict
 
 import psycopg
@@ -198,6 +198,8 @@ class SessionRegistry:
     caused by transaction-mode pooling itself, not by asyncio/event-loop
     binding, so it affects sync connections just as much."""
 
+    _SESSION_COLS = ("session_id", "title", "created_at", "updated_at", "turn_count", "archived", "deleted_at")
+
     def __init__(self, conn: sqlite3.Connection | psycopg.Connection, backend: str, conn_string: str | None = None):
         self._conn = conn
         self._is_postgres = backend == "postgres"
@@ -237,23 +239,28 @@ class SessionRegistry:
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
                     turn_count INTEGER NOT NULL DEFAULT 1,
-                    archived   INTEGER NOT NULL DEFAULT 0
+                    archived   INTEGER NOT NULL DEFAULT 0,
+                    deleted_at TEXT
                 )
                 """
             )
         )
-        # Migrates sessions tables created before the archived column existed.
-        # Neither sqlite's ALTER TABLE ADD COLUMN nor (for simplicity, treating
-        # both backends the same) this codepath's postgres usage rely on "IF
-        # NOT EXISTS" — sqlite's ALTER TABLE grammar doesn't support that
+        # Migrates sessions tables created before the archived/deleted_at columns
+        # existed. Neither sqlite's ALTER TABLE ADD COLUMN nor (for simplicity,
+        # treating both backends the same) this codepath's postgres usage rely
+        # on "IF NOT EXISTS" — sqlite's ALTER TABLE grammar doesn't support that
         # clause on ADD COLUMN (verified: raises "near EXISTS: syntax error")
-        # — so this just attempts the add and swallows the "already exists"
+        # — so this just attempts each add and swallows the "already exists"
         # error every subsequent call hits once the column is there.
-        try:
-            self._conn.execute(self._sql("ALTER TABLE sessions ADD COLUMN archived INTEGER NOT NULL DEFAULT 0"))
-            self._commit_if_needed()
-        except (sqlite3.OperationalError, psycopg.errors.DuplicateColumn):
-            pass  # column already exists from a prior _ensure_table() call
+        for ddl in (
+            "ALTER TABLE sessions ADD COLUMN archived INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE sessions ADD COLUMN deleted_at TEXT",
+        ):
+            try:
+                self._conn.execute(self._sql(ddl))
+                self._commit_if_needed()
+            except (sqlite3.OperationalError, psycopg.errors.DuplicateColumn):
+                pass  # column already exists from a prior _ensure_table() call
         self._conn.execute(
             self._sql(
                 """
@@ -289,18 +296,40 @@ class SessionRegistry:
         self._commit_if_needed()
 
     def list_sessions(self, include_archived: bool = False) -> list[dict]:
-        """Most-recently-updated first, for the sidebar. By default excludes
-        archived sessions; pass include_archived=True to list every session
+        """Most-recently-updated first, for the sidebar. Always excludes
+        soft-deleted (trashed) sessions. By default also excludes archived
+        ones; pass include_archived=True to list every non-trashed session
         (each row's "archived" field distinguishes them)."""
-        where = "" if include_archived else "WHERE archived = 0"
+        where = "deleted_at IS NULL" if include_archived else "archived = 0 AND deleted_at IS NULL"
+        cur = self._execute(
+            self._sql(f"SELECT {', '.join(self._SESSION_COLS)} FROM sessions WHERE {where} ORDER BY updated_at DESC")
+        )
+        return [dict(zip(self._SESSION_COLS, row)) for row in cur.fetchall()]
+
+    def list_trashed_sessions(self) -> list[dict]:
+        """Soft-deleted sessions, most-recently-deleted first — for the
+        sidebar's Trash view (restore, or delete forever before the retention
+        worker would purge them anyway)."""
         cur = self._execute(
             self._sql(
-                "SELECT session_id, title, created_at, updated_at, turn_count, archived "
-                f"FROM sessions {where} ORDER BY updated_at DESC"
+                f"SELECT {', '.join(self._SESSION_COLS)} FROM sessions "
+                "WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC"
             )
         )
-        cols = ("session_id", "title", "created_at", "updated_at", "turn_count", "archived")
-        return [dict(zip(cols, row)) for row in cur.fetchall()]
+        return [dict(zip(self._SESSION_COLS, row)) for row in cur.fetchall()]
+
+    def list_expired_trashed_sessions(self, retention_days: int) -> list[dict]:
+        """Soft-deleted sessions whose retention window has elapsed — for the
+        periodic purge worker (see scripts/purge_deleted_sessions.py)."""
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=retention_days)).isoformat()
+        cur = self._execute(
+            self._sql(
+                f"SELECT {', '.join(self._SESSION_COLS)} FROM sessions "
+                "WHERE deleted_at IS NOT NULL AND deleted_at <= ? ORDER BY deleted_at"
+            ),
+            (cutoff,),
+        )
+        return [dict(zip(self._SESSION_COLS, row)) for row in cur.fetchall()]
 
     def set_archived(self, session_id: str, archived: bool) -> None:
         self._execute(
@@ -309,11 +338,32 @@ class SessionRegistry:
         )
         self._commit_if_needed()
 
-    def delete_session(self, session_id: str) -> None:
-        """Removes the session from the registry (title/timestamps) and its
+    def soft_delete_session(self, session_id: str) -> None:
+        """Marks a session deleted without touching its data — it drops out of
+        the sidebar's active/archived lists but stays fully intact (registry
+        row + checkpointer thread) until restore_session() or the retention
+        worker's hard_delete_session() call."""
+        self._execute(
+            self._sql("UPDATE sessions SET deleted_at = ? WHERE session_id = ?"),
+            (_utcnow(), session_id),
+        )
+        self._commit_if_needed()
+
+    def restore_session(self, session_id: str) -> None:
+        """Undoes soft_delete_session(); the session reappears in the active
+        list, or the archived one if it was archived before being deleted."""
+        self._execute(
+            self._sql("UPDATE sessions SET deleted_at = NULL WHERE session_id = ?"),
+            (session_id,),
+        )
+        self._commit_if_needed()
+
+    def hard_delete_session(self, session_id: str) -> None:
+        """Permanently removes the registry row (title/timestamps) and its
         routing trace. Does NOT touch the checkpointer's own thread data —
         callers that also want the underlying conversation gone must delete
-        that separately (see streamlit_app.py's _delete_session_thread)."""
+        that separately (see streamlit_app.py's _delete_session_thread, or
+        scripts/purge_deleted_sessions.py for the retention worker)."""
         self._execute(self._sql("DELETE FROM turn_routes WHERE session_id = ?"), (session_id,))
         self._execute(self._sql("DELETE FROM sessions WHERE session_id = ?"), (session_id,))
         self._commit_if_needed()

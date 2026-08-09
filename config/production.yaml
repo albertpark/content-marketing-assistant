@@ -17,6 +17,10 @@ image:
 session_store:
   backend: postgres
   url: ${SESSION_STORE_URL}   # Supabase pooler connection string (transaction mode)
+  # Days a deleted session stays recoverable in the sidebar's Trash before
+  # scripts/purge_deleted_sessions.py removes it for good (override via
+  # SESSION_RETENTION_DAYS).
+  retention_days: 14
 
 logging:
   level: INFO

@@ -266,9 +266,11 @@ async def _approve_draft(thread_id: str) -> None:
 
 async def _delete_session_thread(thread_id: str) -> None:
     # Removes the checkpointer's own conversation data for this session, on
-    # top of the registry row (deleted separately by the caller) — otherwise
-    # "Delete" would only hide the session from the sidebar while its full
-    # message/draft history stayed on disk under a now-orphaned thread_id.
+    # top of the registry row (purged separately by the caller via
+    # registry.hard_delete_session). Only called for a *permanent* delete
+    # ("Delete forever" from Trash) — the regular sidebar delete button is a
+    # soft delete (registry.soft_delete_session) that leaves this untouched
+    # so the conversation is still there if the session gets restored.
     await _with_graph(lambda graph: graph.checkpointer.adelete_thread(thread_id))
 
 
@@ -344,6 +346,83 @@ def _switch_to_new_session() -> None:
     st.session_state.chat_log = []
 
 
+def _open_session(registry, session_id: str) -> None:
+    st.session_state.session_id = session_id
+    resumed_state = _run_async(_read_state(session_id))
+    routes_by_turn = registry.get_routes(session_id)
+    st.session_state.chat_log = _chat_log_from_state(resumed_state, routes_by_turn)
+
+
+def _render_active_session_row(registry, session: dict) -> None:
+    """One row of the main (non-trashed) session list: title button, then
+    archive/unarchive, then delete (soft — moves it to Trash) on the far
+    right, per the sidebar's icon layout."""
+    session_id = session["session_id"]
+    is_current = session_id == st.session_state.session_id
+    title_col, archive_col, delete_col = st.columns([6, 1, 1])
+    with title_col:
+        clicked = st.button(
+            ("• " if is_current else "") + session["title"],
+            key=f"session_{session_id}",
+            # help=f"Updated {_format_updated_at(session['updated_at'])} · {session['turn_count']} turn(s)",
+            use_container_width=True,
+            disabled=is_current,
+        )
+        if clicked:
+            _open_session(registry, session_id)
+            st.rerun()
+    with archive_col:
+        if session["archived"]:
+            if st.button(
+                "", icon="↩️", key=f"unarchive_{session_id}", help="Unarchive session", use_container_width=True
+            ):
+                registry.set_archived(session_id, False)
+                st.rerun()
+        else:
+            if st.button(
+                "", icon="🗄️", key=f"archive_{session_id}", help="Archive session", use_container_width=True
+            ):
+                registry.set_archived(session_id, True)
+                if is_current:
+                    _switch_to_new_session()
+                st.rerun()
+    with delete_col:
+        with st.popover("", icon="🗑️", help="Delete session", use_container_width=True):
+            st.write(f"Delete **{session['title']}**? It moves to Trash, recoverable for {_retention_days()} day(s).")
+            if st.button("Delete", key=f"delete_{session_id}", type="primary"):
+                registry.soft_delete_session(session_id)
+                if is_current:
+                    _switch_to_new_session()
+                st.rerun()
+
+
+def _render_trashed_session_row(registry, session: dict) -> None:
+    """One row of the Trash list: restore on the left, permanent delete (with
+    its own confirmation, since this one purges the checkpointer thread too
+    and can't be undone) on the far right."""
+    session_id = session["session_id"]
+    title_col, restore_col, purge_col = st.columns([6, 1, 1])
+    with title_col:
+        st.caption(session["title"])
+    with restore_col:
+        if st.button("", icon="↩️", key=f"restore_{session_id}", help="Restore session", use_container_width=True):
+            registry.restore_session(session_id)
+            st.rerun()
+    with purge_col:
+        with st.popover("", icon="🗑️", help="Delete forever", use_container_width=True):
+            st.write(f"Permanently delete **{session['title']}**? This can't be undone.")
+            if st.button("Delete forever", key=f"purge_{session_id}", type="primary"):
+                _run_async(_delete_session_thread(session_id))
+                registry.hard_delete_session(session_id)
+                if session_id == st.session_state.session_id:
+                    _switch_to_new_session()
+                st.rerun()
+
+
+def _retention_days() -> int:
+    return get_settings().session_retention_days
+
+
 def _render_sidebar(registry) -> None:
     with st.sidebar:
         st.header("Sessions")
@@ -352,67 +431,26 @@ def _render_sidebar(registry) -> None:
             st.rerun()
 
         st.divider()
-        for session in registry.list_sessions():
-            session_id = session["session_id"]
-            is_current = session_id == st.session_state.session_id
-            title_col, archive_col, delete_col = st.columns([6, 1, 1])
-            with title_col:
-                clicked = st.button(
-                    ("• " if is_current else "") + session["title"],
-                    key=f"session_{session_id}",
-                    # help=f"Updated {_format_updated_at(session['updated_at'])} · {session['turn_count']} turn(s)",
-                    use_container_width=True,
-                    disabled=is_current,
-                )
-            with archive_col:
-                if st.button(
-                    "", icon="🗄️", key=f"archive_{session_id}", help="Archive session", use_container_width=True
-                ):
-                    registry.set_archived(session_id, True)
-                    if is_current:
-                        _switch_to_new_session()
-                    st.rerun()
-            with delete_col:
-                with st.popover("", icon="🗑️", help="Delete session", use_container_width=True):
-                    st.write(f"Delete **{session['title']}**? This can't be undone.")
-                    if st.button("Confirm delete", key=f"confirm_delete_{session_id}", type="primary"):
-                        _run_async(_delete_session_thread(session_id))
-                        registry.delete_session(session_id)
-                        if is_current:
-                            _switch_to_new_session()
-                        st.rerun()
-            if clicked:
-                st.session_state.session_id = session_id
-                resumed_state = _run_async(_read_state(session_id))
-                routes_by_turn = registry.get_routes(session_id)
-                st.session_state.chat_log = _chat_log_from_state(resumed_state, routes_by_turn)
-                st.rerun()
+        all_sessions = registry.list_sessions(include_archived=True)
+        active_sessions = [s for s in all_sessions if not s["archived"]]
+        archived_sessions = [s for s in all_sessions if s["archived"]]
 
-        archived_sessions = [s for s in registry.list_sessions(include_archived=True) if s["archived"]]
+        for session in active_sessions:
+            _render_active_session_row(registry, session)
+
         if archived_sessions:
             st.divider()
             with st.expander(f"Archived ({len(archived_sessions)})"):
                 for session in archived_sessions:
-                    session_id = session["session_id"]
-                    title_col, restore_col, delete_col = st.columns([6, 1, 1])
-                    with title_col:
-                        st.caption(session["title"])
-                    with restore_col:
-                        if st.button(
-                            "", icon="↩️", key=f"restore_{session_id}", help="Unarchive session",
-                            use_container_width=True,
-                        ):
-                            registry.set_archived(session_id, False)
-                            st.rerun()
-                    with delete_col:
-                        with st.popover("", icon="🗑️", help="Delete session", use_container_width=True):
-                            st.write(f"Delete **{session['title']}**? This can't be undone.")
-                            if st.button("Confirm delete", key=f"confirm_delete_archived_{session_id}", type="primary"):
-                                _run_async(_delete_session_thread(session_id))
-                                registry.delete_session(session_id)
-                                if session_id == st.session_state.session_id:
-                                    _switch_to_new_session()
-                                st.rerun()
+                    _render_active_session_row(registry, session)
+
+        trashed_sessions = registry.list_trashed_sessions()
+        if trashed_sessions:
+            st.divider()
+            with st.expander(f"Trash ({len(trashed_sessions)})"):
+                st.caption(f"Permanently deleted after {_retention_days()} day(s).")
+                for session in trashed_sessions:
+                    _render_trashed_session_row(registry, session)
 
 
 def _copy_to_clipboard_button(text: str, label: str, key: str) -> None:

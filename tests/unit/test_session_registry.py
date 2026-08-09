@@ -93,14 +93,72 @@ def test_set_archived_can_be_toggled_back(registry):
     assert [s["session_id"] for s in registry.list_sessions()] == ["session-1"]
 
 
-def test_delete_session_removes_session_and_routes(registry):
+def test_hard_delete_session_removes_session_and_routes(registry):
     registry.record_start("session-1", "Title")
     registry.record_routes("session-1", 1, ["▶ Orchestrator started"])
 
-    registry.delete_session("session-1")
+    registry.hard_delete_session("session-1")
 
     assert registry.list_sessions(include_archived=True) == []
     assert registry.get_routes("session-1") == {}
+
+
+def test_soft_delete_session_hides_it_without_removing_data(registry):
+    registry.record_start("session-1", "Title")
+
+    registry.soft_delete_session("session-1")
+
+    assert registry.list_sessions() == []
+    assert registry.list_sessions(include_archived=True) == []
+    trashed = registry.list_trashed_sessions()
+    assert len(trashed) == 1
+    assert trashed[0]["session_id"] == "session-1"
+    assert trashed[0]["deleted_at"] is not None
+
+
+def test_restore_session_undoes_soft_delete(registry):
+    registry.record_start("session-1", "Title")
+    registry.soft_delete_session("session-1")
+
+    registry.restore_session("session-1")
+
+    assert [s["session_id"] for s in registry.list_sessions()] == ["session-1"]
+    assert registry.list_trashed_sessions() == []
+
+
+def test_restore_session_keeps_archived_flag(registry):
+    registry.record_start("session-1", "Title")
+    registry.set_archived("session-1", True)
+    registry.soft_delete_session("session-1")
+
+    registry.restore_session("session-1")
+
+    active_incl_archived = registry.list_sessions(include_archived=True)
+    assert len(active_incl_archived) == 1
+    assert active_incl_archived[0]["archived"] == 1
+    # still hidden from the default (non-archived) view
+    assert registry.list_sessions() == []
+
+
+def test_list_expired_trashed_sessions_filters_by_retention_window(registry):
+    from datetime import datetime, timedelta, timezone
+
+    registry.record_start("old-session", "Deleted 20 days ago")
+    registry.record_start("recent-session", "Deleted 2 days ago")
+
+    now = datetime.now(timezone.utc)
+    old_ts = (now - timedelta(days=20)).isoformat()
+    recent_ts = (now - timedelta(days=2)).isoformat()
+
+    registry.soft_delete_session("old-session")
+    registry.soft_delete_session("recent-session")
+    # Backdate deleted_at directly — soft_delete_session always stamps "now".
+    registry._conn.execute("UPDATE sessions SET deleted_at = ? WHERE session_id = ?", (old_ts, "old-session"))
+    registry._conn.execute("UPDATE sessions SET deleted_at = ? WHERE session_id = ?", (recent_ts, "recent-session"))
+    registry._conn.commit()
+
+    expired = registry.list_expired_trashed_sessions(retention_days=14)
+    assert [s["session_id"] for s in expired] == ["old-session"]
 
 
 def test_ensure_table_migrates_sessions_table_missing_archived_column(tmp_path):
@@ -128,6 +186,11 @@ def test_ensure_table_migrates_sessions_table_missing_archived_column(tmp_path):
     sessions = registry.list_sessions()
     assert len(sessions) == 1
     assert sessions[0]["archived"] == 0
+    assert sessions[0]["deleted_at"] is None
+
+    # the migrated deleted_at column is also usable, not just present
+    registry.soft_delete_session("session-1")
+    assert registry.list_trashed_sessions()[0]["session_id"] == "session-1"
 
 
 def test_derive_session_title_keeps_short_query_verbatim():
