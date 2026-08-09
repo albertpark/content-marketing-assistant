@@ -6,6 +6,7 @@ import html
 import json
 import sys
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -186,6 +187,21 @@ async def _run_turn(
             return await graph.ainvoke(input_state, config=config)
 
         raw_by_node: dict[str, str] = {}
+        # Rendering on every token chunk (potentially hundreds/sec for a full
+        # post) sends that many full markdown re-renders to the browser and
+        # visibly janks the tab — throttle the live preview to a fixed cadence
+        # instead. The final flush after the loop guarantees the last chunk
+        # (which the throttle would otherwise drop) still gets shown; the
+        # authoritative content comes from the post-rerun dashboard regardless.
+        last_rendered_at: dict[str, float] = {}
+
+        def _due(node_name: str) -> bool:
+            now = time.monotonic()
+            if now - last_rendered_at.get(node_name, 0.0) < 0.15:
+                return False
+            last_rendered_at[node_name] = now
+            return True
+
         async for mode, payload in graph.astream(
             input_state, config=config, stream_mode=["debug", "messages"]
         ):
@@ -215,14 +231,23 @@ async def _run_turn(
                 if node_name not in ("blog_writer", "linkedin_writer"):
                     continue
                 raw_by_node[node_name] = raw_by_node.get(node_name, "") + (msg_chunk.content or "")
-                if node_name == "blog_writer" and blog_placeholder is not None:
+                if node_name == "blog_writer" and blog_placeholder is not None and _due(node_name):
                     body = _extract_streaming_field(raw_by_node[node_name], "body_markdown")
                     if body:
                         blog_placeholder.markdown(body)
-                elif node_name == "linkedin_writer" and linkedin_placeholder is not None:
+                elif node_name == "linkedin_writer" and linkedin_placeholder is not None and _due(node_name):
                     text = _extract_streaming_field(raw_by_node[node_name], "text")
                     if text:
                         linkedin_placeholder.text(text)
+
+        if blog_placeholder is not None and "blog_writer" in raw_by_node:
+            body = _extract_streaming_field(raw_by_node["blog_writer"], "body_markdown")
+            if body:
+                blog_placeholder.markdown(body)
+        if linkedin_placeholder is not None and "linkedin_writer" in raw_by_node:
+            text = _extract_streaming_field(raw_by_node["linkedin_writer"], "text")
+            if text:
+                linkedin_placeholder.text(text)
         return None
 
     await _with_graph(op)
@@ -269,19 +294,28 @@ def _chat_log_from_state(state: dict, routes_by_turn: dict[int, list[str]] | Non
     return log
 
 
-_PROVIDER_LABELS = {"openai": "OpenAI GPT-4o", "anthropic": "Claude", "gemini": "Gemini"}
+def _provider_labels(settings) -> dict[str, str]:
+    # Named after the actually-configured model (settings.*_model, which env
+    # vars like OPENAI_MODEL override) rather than a hardcoded display name,
+    # so this can't silently drift from what's really being called.
+    return {
+        "openai": f"OpenAI ({settings.openai_model})",
+        "anthropic": f"Claude ({settings.anthropic_model})",
+        "gemini": f"Gemini ({settings.google_model})",
+    }
 
 
 def _render_provider_selector(settings) -> str:
+    labels = _provider_labels(settings)
     with st.sidebar:
         st.header("Model")
-        options = list(_PROVIDER_LABELS)
+        options = list(labels)
         default_index = options.index(settings.llm_primary_provider) if settings.llm_primary_provider in options else 0
         selected = st.selectbox(
             "LLM provider",
             options=options,
             index=default_index,
-            format_func=lambda key: _PROVIDER_LABELS[key],
+            format_func=lambda key: labels[key],
             key="llm_provider_choice",
         )
         st.caption("Provider is fixed for a session — start a new session to switch.")
@@ -493,7 +527,7 @@ def main() -> None:
                             input_state,
                             thread_id,
                             status=status,
-                            provider_label=_PROVIDER_LABELS[selected_provider],
+                            provider_label=_provider_labels(settings)[selected_provider],
                             blog_placeholder=blog_placeholder,
                             linkedin_placeholder=linkedin_placeholder,
                             ctx=get_script_run_ctx(),
