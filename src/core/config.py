@@ -46,6 +46,7 @@ class Settings:
     session_store_backend: str
     session_store_url: str | None
     session_store_path: str
+    session_retention_days: int
 
     max_retries: int
     backoff_seconds: float
@@ -120,6 +121,9 @@ def load_settings(environment: str | None = None) -> Settings:
         session_store_path=str(
             _PROJECT_ROOT
             / (os.getenv("SESSION_STORE_PATH") or session_store.get("path", "contentalchemy.db"))
+        ),
+        session_retention_days=int(
+            os.getenv("SESSION_RETENTION_DAYS") or session_store.get("retention_days", 14)
         ),
         max_retries=int(os.getenv("MAX_RETRIES") or resilience.get("max_retries", 3)),
         backoff_seconds=float(os.getenv("BACKOFF_SECONDS") or resilience.get("backoff_seconds", 2)),

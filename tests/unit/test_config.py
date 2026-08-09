@@ -14,6 +14,7 @@ _ENV_VARS_TO_CLEAR = (
     "SESSION_STORE_URL",
     "SESSION_STORE_BACKEND",
     "SESSION_STORE_PATH",
+    "SESSION_RETENTION_DAYS",
     "ANTHROPIC_API_KEY",
     "GOOGLE_API_KEY",
     "PERPLEXITY_API_KEY",
@@ -109,3 +110,14 @@ def test_session_store_path_env_override(monkeypatch, tmp_path):
 def test_session_store_path_defaults_relative_to_project_root():
     settings = load_settings("development")
     assert settings.session_store_path.endswith("contentalchemy.db")
+
+
+def test_session_retention_days_defaults_to_fourteen():
+    settings = load_settings("development")
+    assert settings.session_retention_days == 14
+
+
+def test_session_retention_days_env_override(monkeypatch):
+    monkeypatch.setenv("SESSION_RETENTION_DAYS", "30")
+    settings = load_settings("development")
+    assert settings.session_retention_days == 30

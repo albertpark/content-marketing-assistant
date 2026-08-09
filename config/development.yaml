@@ -21,6 +21,10 @@ session_store:
   # path: contentalchemy.db (relative to project root; override via
   # SESSION_STORE_PATH). Also supported: backend: memory (non-persistent,
   # mainly for tests — see SESSION_STORE_BACKEND env override).
+  # Days a deleted session stays recoverable in the sidebar's Trash before
+  # scripts/purge_deleted_sessions.py removes it for good (override via
+  # SESSION_RETENTION_DAYS).
+  retention_days: 14
 
 logging:
   level: DEBUG

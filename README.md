@@ -359,6 +359,7 @@ Access the application at `http://localhost:8501`.
 | `SERPAPI_API_KEY` | Primary research backend | Yes |
 | `PERPLEXITY_API_KEY` | Alternative research backend | No |
 | `SESSION_STORE_URL` | Backing store for LangGraph checkpoints (Redis/Postgres); falls back to in-memory for local dev | No |
+| `SESSION_RETENTION_DAYS` | Days a deleted session stays recoverable in the sidebar's Trash before `scripts/purge_deleted_sessions.py` removes it for good; default 14 | No |
 
 ---
 
@@ -466,6 +467,17 @@ configured LLM provider key (see [Environment Variables](#environment-variables)
 ```bash
 uv run python scripts/eval_routing.py
 uv run python scripts/eval_routing.py --provider anthropic --threshold 0.9
+```
+
+**Deleted session cleanup:** deleting a session from the sidebar is a soft delete —
+it moves to a "Trash" section (restorable) instead of disappearing immediately.
+`scripts/purge_deleted_sessions.py` permanently removes sessions that have sat in
+Trash past the retention window (`SESSION_RETENTION_DAYS`, default 14 days),
+including their checkpointer thread data. Run it on a schedule (cron, a scheduled
+task, a Docker/Kubernetes CronJob):
+
+```bash
+uv run python scripts/purge_deleted_sessions.py
 ```
 
 ---
