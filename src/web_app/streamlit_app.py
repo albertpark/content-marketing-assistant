@@ -264,6 +264,14 @@ async def _approve_draft(thread_id: str) -> None:
     await _with_graph(lambda graph: graph.aupdate_state(config, {"human_approved_override": True}))
 
 
+async def _delete_session_thread(thread_id: str) -> None:
+    # Removes the checkpointer's own conversation data for this session, on
+    # top of the registry row (deleted separately by the caller) — otherwise
+    # "Delete" would only hide the session from the sidebar while its full
+    # message/draft history stayed on disk under a now-orphaned thread_id.
+    await _with_graph(lambda graph: graph.checkpointer.adelete_thread(thread_id))
+
+
 def _chat_log_from_state(state: dict, routes_by_turn: dict[int, list[str]] | None = None) -> list[dict]:
     """Reconstructs the visible transcript when switching to a resumed session
     — st.session_state.chat_log is local to this browser tab and won't have
@@ -331,30 +339,80 @@ def _format_updated_at(iso_timestamp: str) -> str:
     return f"{dt.strftime('%b')} {dt.day}, {dt.year}, {dt.strftime('%I:%M %p').lstrip('0')}"
 
 
+def _switch_to_new_session() -> None:
+    st.session_state.session_id = new_session_id()
+    st.session_state.chat_log = []
+
+
 def _render_sidebar(registry) -> None:
     with st.sidebar:
         st.header("Sessions")
         if st.button("+ New session", use_container_width=True):
-            st.session_state.session_id = new_session_id()
-            st.session_state.chat_log = []
+            _switch_to_new_session()
             st.rerun()
 
         st.divider()
         for session in registry.list_sessions():
-            is_current = session["session_id"] == st.session_state.session_id
-            clicked = st.button(
-                ("• " if is_current else "") + session["title"],
-                key=f"session_{session['session_id']}",
-                # help=f"Updated {_format_updated_at(session['updated_at'])} · {session['turn_count']} turn(s)",
-                use_container_width=True,
-                disabled=is_current,
-            )
+            session_id = session["session_id"]
+            is_current = session_id == st.session_state.session_id
+            title_col, archive_col, delete_col = st.columns([6, 1, 1])
+            with title_col:
+                clicked = st.button(
+                    ("• " if is_current else "") + session["title"],
+                    key=f"session_{session_id}",
+                    # help=f"Updated {_format_updated_at(session['updated_at'])} · {session['turn_count']} turn(s)",
+                    use_container_width=True,
+                    disabled=is_current,
+                )
+            with archive_col:
+                if st.button(
+                    "", icon="🗄️", key=f"archive_{session_id}", help="Archive session", use_container_width=True
+                ):
+                    registry.set_archived(session_id, True)
+                    if is_current:
+                        _switch_to_new_session()
+                    st.rerun()
+            with delete_col:
+                with st.popover("", icon="🗑️", help="Delete session", use_container_width=True):
+                    st.write(f"Delete **{session['title']}**? This can't be undone.")
+                    if st.button("Confirm delete", key=f"confirm_delete_{session_id}", type="primary"):
+                        _run_async(_delete_session_thread(session_id))
+                        registry.delete_session(session_id)
+                        if is_current:
+                            _switch_to_new_session()
+                        st.rerun()
             if clicked:
-                st.session_state.session_id = session["session_id"]
-                resumed_state = _run_async(_read_state(session["session_id"]))
-                routes_by_turn = registry.get_routes(session["session_id"])
+                st.session_state.session_id = session_id
+                resumed_state = _run_async(_read_state(session_id))
+                routes_by_turn = registry.get_routes(session_id)
                 st.session_state.chat_log = _chat_log_from_state(resumed_state, routes_by_turn)
                 st.rerun()
+
+        archived_sessions = [s for s in registry.list_sessions(include_archived=True) if s["archived"]]
+        if archived_sessions:
+            st.divider()
+            with st.expander(f"Archived ({len(archived_sessions)})"):
+                for session in archived_sessions:
+                    session_id = session["session_id"]
+                    title_col, restore_col, delete_col = st.columns([6, 1, 1])
+                    with title_col:
+                        st.caption(session["title"])
+                    with restore_col:
+                        if st.button(
+                            "", icon="↩️", key=f"restore_{session_id}", help="Unarchive session",
+                            use_container_width=True,
+                        ):
+                            registry.set_archived(session_id, False)
+                            st.rerun()
+                    with delete_col:
+                        with st.popover("", icon="🗑️", help="Delete session", use_container_width=True):
+                            st.write(f"Delete **{session['title']}**? This can't be undone.")
+                            if st.button("Confirm delete", key=f"confirm_delete_archived_{session_id}", type="primary"):
+                                _run_async(_delete_session_thread(session_id))
+                                registry.delete_session(session_id)
+                                if session_id == st.session_state.session_id:
+                                    _switch_to_new_session()
+                                st.rerun()
 
 
 def _copy_to_clipboard_button(text: str, label: str, key: str) -> None:

@@ -72,6 +72,64 @@ def test_list_sessions_orders_by_updated_at_desc(monkeypatch, registry):
     assert ordered_ids == ["session-a", "session-b"]
 
 
+def test_list_sessions_excludes_archived_by_default(registry):
+    registry.record_start("session-1", "Kept")
+    registry.record_start("session-2", "Archived")
+    registry.set_archived("session-2", True)
+
+    ids = [s["session_id"] for s in registry.list_sessions()]
+    assert ids == ["session-1"]
+
+    all_ids = {s["session_id"]: s["archived"] for s in registry.list_sessions(include_archived=True)}
+    assert all_ids == {"session-1": 0, "session-2": 1}
+
+
+def test_set_archived_can_be_toggled_back(registry):
+    registry.record_start("session-1", "Title")
+    registry.set_archived("session-1", True)
+    assert registry.list_sessions() == []
+
+    registry.set_archived("session-1", False)
+    assert [s["session_id"] for s in registry.list_sessions()] == ["session-1"]
+
+
+def test_delete_session_removes_session_and_routes(registry):
+    registry.record_start("session-1", "Title")
+    registry.record_routes("session-1", 1, ["▶ Orchestrator started"])
+
+    registry.delete_session("session-1")
+
+    assert registry.list_sessions(include_archived=True) == []
+    assert registry.get_routes("session-1") == {}
+
+
+def test_ensure_table_migrates_sessions_table_missing_archived_column(tmp_path):
+    # Simulates a database created before the archived column existed.
+    conn = sqlite3.connect(str(tmp_path / "legacy-sessions.db"))
+    conn.execute(
+        """
+        CREATE TABLE sessions (
+            session_id TEXT PRIMARY KEY,
+            title      TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            turn_count INTEGER NOT NULL DEFAULT 1
+        )
+        """
+    )
+    conn.execute(
+        "INSERT INTO sessions (session_id, title, created_at, updated_at, turn_count) VALUES (?, ?, ?, ?, 1)",
+        ("session-1", "Pre-migration session", "2026-01-01T00:00:00+00:00", "2026-01-01T00:00:00+00:00"),
+    )
+    conn.commit()
+
+    registry = SessionRegistry(conn, backend="sqlite")
+
+    sessions = registry.list_sessions()
+    assert len(sessions) == 1
+    assert sessions[0]["archived"] == 0
+
+
 def test_derive_session_title_keeps_short_query_verbatim():
     assert derive_session_title("Write about tea") == "Write about tea"
 

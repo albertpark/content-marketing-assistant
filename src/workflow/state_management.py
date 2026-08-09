@@ -236,11 +236,24 @@ class SessionRegistry:
                     title      TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
-                    turn_count INTEGER NOT NULL DEFAULT 1
+                    turn_count INTEGER NOT NULL DEFAULT 1,
+                    archived   INTEGER NOT NULL DEFAULT 0
                 )
                 """
             )
         )
+        # Migrates sessions tables created before the archived column existed.
+        # Neither sqlite's ALTER TABLE ADD COLUMN nor (for simplicity, treating
+        # both backends the same) this codepath's postgres usage rely on "IF
+        # NOT EXISTS" — sqlite's ALTER TABLE grammar doesn't support that
+        # clause on ADD COLUMN (verified: raises "near EXISTS: syntax error")
+        # — so this just attempts the add and swallows the "already exists"
+        # error every subsequent call hits once the column is there.
+        try:
+            self._conn.execute(self._sql("ALTER TABLE sessions ADD COLUMN archived INTEGER NOT NULL DEFAULT 0"))
+            self._commit_if_needed()
+        except (sqlite3.OperationalError, psycopg.errors.DuplicateColumn):
+            pass  # column already exists from a prior _ensure_table() call
         self._conn.execute(
             self._sql(
                 """
@@ -275,16 +288,35 @@ class SessionRegistry:
         )
         self._commit_if_needed()
 
-    def list_sessions(self) -> list[dict]:
-        """Most-recently-updated first, for the sidebar."""
+    def list_sessions(self, include_archived: bool = False) -> list[dict]:
+        """Most-recently-updated first, for the sidebar. By default excludes
+        archived sessions; pass include_archived=True to list every session
+        (each row's "archived" field distinguishes them)."""
+        where = "" if include_archived else "WHERE archived = 0"
         cur = self._execute(
             self._sql(
-                "SELECT session_id, title, created_at, updated_at, turn_count "
-                "FROM sessions ORDER BY updated_at DESC"
+                "SELECT session_id, title, created_at, updated_at, turn_count, archived "
+                f"FROM sessions {where} ORDER BY updated_at DESC"
             )
         )
-        cols = ("session_id", "title", "created_at", "updated_at", "turn_count")
+        cols = ("session_id", "title", "created_at", "updated_at", "turn_count", "archived")
         return [dict(zip(cols, row)) for row in cur.fetchall()]
+
+    def set_archived(self, session_id: str, archived: bool) -> None:
+        self._execute(
+            self._sql("UPDATE sessions SET archived = ? WHERE session_id = ?"),
+            (1 if archived else 0, session_id),
+        )
+        self._commit_if_needed()
+
+    def delete_session(self, session_id: str) -> None:
+        """Removes the session from the registry (title/timestamps) and its
+        routing trace. Does NOT touch the checkpointer's own thread data —
+        callers that also want the underlying conversation gone must delete
+        that separately (see streamlit_app.py's _delete_session_thread)."""
+        self._execute(self._sql("DELETE FROM turn_routes WHERE session_id = ?"), (session_id,))
+        self._execute(self._sql("DELETE FROM sessions WHERE session_id = ?"), (session_id,))
+        self._commit_if_needed()
 
     def record_routes(self, session_id: str, turn_index: int, routes: list[str]) -> None:
         """Persists one turn's agent-routing trace (the lines shown in the
