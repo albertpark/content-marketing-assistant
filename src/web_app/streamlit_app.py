@@ -705,7 +705,17 @@ def main() -> None:
 
     selected_provider = _render_provider_selector(settings)
 
-    registry = get_registry_conn() if settings.session_store_backend in ("sqlite", "postgres") else None
+    registry = None
+    if settings.session_store_backend in ("sqlite", "postgres"):
+        try:
+            registry = get_registry_conn()
+        except Exception as exc:
+            st.error(
+                f"Database connection error — could not reach the "
+                f"'{settings.session_store_backend}' session store. Sessions won't be "
+                f"saved or listed until this is fixed.\n\n```\n{exc}\n```"
+            )
+            st.stop()
     if registry is not None:
         _render_sidebar(registry)
         # Warm the persistent checkpointer connection here, on this (the
