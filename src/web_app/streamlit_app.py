@@ -13,6 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+import psycopg
 import streamlit as st
 import streamlit.components.v1 as components
 from langchain_core.messages import HumanMessage
@@ -75,12 +76,38 @@ st.markdown(
 )
 
 
-def _run_async(coro):
-    # Dispatches onto async_runtime's persistent background-thread loop rather
-    # than asyncio.run()'ing a fresh one per call. Required for get_persistent_graph's
-    # checkpointer connection to survive across reruns (see async_runtime.py);
-    # also just avoids spinning up a new event loop on every interaction.
-    return async_runtime.run(coro)
+def _run_async(coro_fn):
+    """Dispatches coro_fn() onto async_runtime's persistent background-thread
+    loop rather than asyncio.run()'ing a fresh one per call. Required for
+    get_persistent_graph's checkpointer connection to survive across reruns
+    (see async_runtime.py); also just avoids spinning up a new event loop on
+    every interaction.
+
+    Takes a zero-arg callable rather than a coroutine so it can retry: if
+    Supabase's pooler silently dropped the long-lived checkpointer connection
+    while idle, the first attempt fails with psycopg.OperationalError — the
+    same failure mode get_registry_conn's SessionRegistry already recovers
+    from on its own connection (state_management._execute). Here that means
+    dropping the cached persistent graph so it rebuilds against a fresh
+    connection, then re-invoking coro_fn() (the original coroutine object
+    can't be reused after it's raised)."""
+    try:
+        return async_runtime.run(coro_fn())
+    except psycopg.OperationalError:
+        settings = get_settings()
+        if settings.session_store_backend != "postgres":
+            raise
+        get_persistent_graph.clear()
+        get_persistent_graph()
+        try:
+            return async_runtime.run(coro_fn())
+        except psycopg.OperationalError as retry_exc:
+            st.error(
+                "Database connection error — lost the connection to the "
+                "'postgres' session store and could not reconnect.\n\n"
+                f"```\n{retry_exc}\n```"
+            )
+            st.stop()
 
 
 @st.cache_resource
@@ -395,7 +422,7 @@ def _switch_to_new_session() -> None:
 
 def _open_session(registry, session_id: str) -> None:
     st.session_state.session_id = session_id
-    resumed_state = _run_async(_read_state(session_id))
+    resumed_state = _run_async(lambda: _read_state(session_id))
     routes_by_turn = registry.get_routes(session_id)
     st.session_state.chat_log = _chat_log_from_state(resumed_state, routes_by_turn)
 
@@ -521,7 +548,7 @@ def _render_trashed_session_row(registry, session: dict) -> None:
                             type="primary",
                             use_container_width=True,
                         ):
-                            _run_async(_delete_session_thread(session_id))
+                            _run_async(lambda: _delete_session_thread(session_id))
                             registry.hard_delete_session(session_id)
                             st.session_state.pop(confirm_purge_key, None)
                             if session_id == st.session_state.session_id:
@@ -635,7 +662,7 @@ def _render_dashboard(thread_id: str, state: dict) -> None:
             for issue in quality_report.get("issues", []):
                 st.write(f"- {issue}")
             if st.button("Approve this draft for export"):
-                _run_async(_approve_draft(thread_id))
+                _run_async(lambda: _approve_draft(thread_id))
                 st.rerun()
         elif quality_report.get("passed"):
             st.success("Quality gate passed.")
@@ -741,7 +768,7 @@ def main() -> None:
             st.write(user_query)
 
         thread_id = st.session_state.session_id
-        existing_state = _run_async(_read_state(thread_id))
+        existing_state = _run_async(lambda: _read_state(thread_id))
         # 1-based, mirrors sessions.turn_count: counts prior HumanMessages (one per
         # turn) so this turn's routing trace can be keyed and looked up the same
         # way whether or not the registry backs the session store.
@@ -764,7 +791,7 @@ def main() -> None:
             with st.status("Working...", expanded=True) as status:
                 try:
                     _run_async(
-                        _run_turn(
+                        lambda: _run_turn(
                             input_state,
                             thread_id,
                             status=status,
@@ -787,7 +814,7 @@ def main() -> None:
             registry.record_routes(thread_id, turn_index, route_log)
         st.rerun()
 
-    state = _run_async(_read_state(st.session_state.session_id))
+    state = _run_async(lambda: _read_state(st.session_state.session_id))
     if state:
         _render_dashboard(st.session_state.session_id, state)
 
